@@ -1,10 +1,14 @@
 .venv/
 .env
+.vscode/
 data/raw/*.sqlite
 data/raw/*.db
 data/raw/*.sqlite3
+data/*.parquet
 __pycache__/
 *.pyc
+notebooks/_cell*.png
+notebooks/*.parquet
 
 
 
