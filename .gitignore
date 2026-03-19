@@ -148,6 +148,7 @@ dmypy.json
 
 
 data/*.csv
+data/processed/
 models/*.sav
 mlruns
 models/*
