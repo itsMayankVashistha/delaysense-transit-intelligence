@@ -30,8 +30,8 @@ ROLLING_WINDOW = os.getenv("ROLLING_WINDOW", "10min")
 LATE_THRESHOLD_SECONDS = int(os.getenv("LATE_THRESHOLD_SECONDS", "60"))  # 1 min
 
 # Output paths
-OUT_DATASET_PATH = os.getenv("OUT_DATASET_PATH", "data/processed/dataset_192H_60.parquet")
-OUT_BASELINE_PATH = os.getenv("OUT_BASELINE_PATH", "data/processed/baseline_table_192H_60.parquet")
+OUT_DATASET_PATH = os.getenv("OUT_DATASET_PATH", "data/processed/dataset_192H_60_forecast.parquet")
+OUT_BASELINE_PATH = os.getenv("OUT_BASELINE_PATH", "data/processed/baseline_table_192H_60_forecast.parquet")
 
 # Performance toggles
 INCLUDE_ROLLING_STD = int(os.getenv("INCLUDE_ROLLING_STD", "0"))  # default OFF (std is expensive)
@@ -216,6 +216,7 @@ def main():
     # 9) Label
     df["deviation_from_baseline"] = df["time_to_station"] - df["baseline_median_tts"]
     df["late"] = (df["deviation_from_baseline"] > LATE_THRESHOLD_SECONDS).astype(int)
+    df['late_3min'] = (df['deviation_from_baseline'] > 180).astype(int)
 
     # Drop rows missing baseline (rare with small slices)
     df = df.dropna(subset=["baseline_median_tts"]).copy()
@@ -226,6 +227,7 @@ def main():
         "stop_id",
         "stop_name",
         "line_id",
+        "vehicle_id",
         "direction",
         "platform_name",
         "destination_name",
@@ -236,10 +238,10 @@ def main():
         "roll_mean_tts_10m",
         "roll_max_tts_10m",
         "roll_count_10m",
-        "roll_std_tts_10m",
         "baseline_median_tts",
         "deviation_from_baseline",
         "late",
+        "late_3min",
     ]
     df_out = df[keep_cols].copy()
 
