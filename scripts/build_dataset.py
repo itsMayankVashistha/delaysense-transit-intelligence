@@ -2,14 +2,20 @@ import os
 import time
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 # ----------------------------
 # CONFIG (can be overridden via env)
 # ----------------------------
-DB_PATH = os.getenv("DB_PATH", "data/raw/tfl_arrivals_final_backup.sqlite")
+DB_PATH = os.getenv("DB_PATH", "..\dsbootcamp_neuefische\capstone-project_KMP\data\raw\tfl_arrivals_final_backup.sqlite")
 
 # Dev window (hours). Start small for fast iteration: 6, 12, 24, 48...
 DEV_HOURS = int(os.getenv("DEV_HOURS", "192"))
@@ -21,11 +27,11 @@ LINES = {"victoria", "jubilee"}
 ROLLING_WINDOW = os.getenv("ROLLING_WINDOW", "10min")
 
 # Label threshold (seconds): late = deviation_from_baseline > threshold
-LATE_THRESHOLD_SECONDS = int(os.getenv("LATE_THRESHOLD_SECONDS", "300"))  # 5 min
+LATE_THRESHOLD_SECONDS = int(os.getenv("LATE_THRESHOLD_SECONDS", "60"))  # 1 min
 
 # Output paths
-OUT_DATASET_PATH = os.getenv("OUT_DATASET_PATH", "data/processed/dataset_192H.parquet")
-OUT_BASELINE_PATH = os.getenv("OUT_BASELINE_PATH", "data/processed/baseline_table_192H.parquet")
+OUT_DATASET_PATH = os.getenv("OUT_DATASET_PATH", "data/processed/dataset_192H_60_forecast.parquet")
+OUT_BASELINE_PATH = os.getenv("OUT_BASELINE_PATH", "data/processed/baseline_table_192H_60_forecast.parquet")
 
 # Performance toggles
 INCLUDE_ROLLING_STD = int(os.getenv("INCLUDE_ROLLING_STD", "0"))  # default OFF (std is expensive)
@@ -36,8 +42,22 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 
+def resolve_project_path(path_str: str) -> Path:
+    path = Path(path_str).expanduser()
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def ensure_parent_dir(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
 def main():
-    os.makedirs("data/processed", exist_ok=True)
+    db_path = resolve_project_path(DB_PATH)
+    out_dataset_path = resolve_project_path(OUT_DATASET_PATH)
+    out_baseline_path = resolve_project_path(OUT_BASELINE_PATH)
+
+    ensure_parent_dir(out_dataset_path)
+    ensure_parent_dir(out_baseline_path)
 
     t0 = time.time()
 
@@ -45,17 +65,44 @@ def main():
         print(f"[{(time.time() - t0)/60:.2f} min] {msg}", flush=True)
 
     mark("Starting build_dataset.py")
-    mark(f"DB_PATH={DB_PATH}")
+    mark(f"DB_PATH={db_path}")
     mark(f"DEV_HOURS={DEV_HOURS} | ROLLING_WINDOW={ROLLING_WINDOW} | LATE_THRESHOLD_SECONDS={LATE_THRESHOLD_SECONDS}")
     mark(f"INCLUDE_ROLLING_STD={INCLUDE_ROLLING_STD} | STOP_LIMIT={STOP_LIMIT}")
 
     # 1) Time cutoff
     cutoff_dt = utc_now() - timedelta(hours=DEV_HOURS)
     cutoff_iso = cutoff_dt.isoformat()
-    mark(f"Cutoff: observed_at >= {cutoff_iso}")
 
     # 2) Load slice from SQLite (only necessary columns; drop raw_json)
-    conn = sqlite3.connect(DB_PATH)
+    if not db_path.exists():
+        raise FileNotFoundError(
+            f"Database not found at {db_path}. Run collect_arrivals.py and backup_sqlite.py first, "
+            "or set DB_PATH to an existing SQLite file."
+        )
+
+    conn = sqlite3.connect(db_path)
+    db_min_observed_at, db_max_observed_at = conn.execute(
+        "SELECT MIN(observed_at), MAX(observed_at) FROM raw_arrivals"
+    ).fetchone()
+
+    if db_max_observed_at is None:
+        conn.close()
+        raise RuntimeError("Database is empty. raw_arrivals has no rows.")
+
+    db_min_dt = datetime.fromisoformat(db_min_observed_at)
+    db_max_dt = datetime.fromisoformat(db_max_observed_at)
+
+    if cutoff_dt > db_max_dt:
+        effective_cutoff_dt = db_min_dt
+        mark(
+            "Requested cutoff is newer than the snapshot. "
+            f"Using full available DB range instead: {db_min_observed_at} to {db_max_observed_at}"
+        )
+    else:
+        effective_cutoff_dt = cutoff_dt
+        mark(f"Cutoff: observed_at >= {cutoff_iso}")
+
+    effective_cutoff_iso = effective_cutoff_dt.isoformat()
 
     query = """
     SELECT
@@ -75,11 +122,17 @@ def main():
       AND line_id IS NOT NULL
     """
 
-    df = pd.read_sql_query(query, conn, params=(cutoff_iso,))
-    conn.close()
+    df = pd.read_sql_query(query, conn, params=(effective_cutoff_iso,))
 
     if df.empty:
-        raise RuntimeError("No data returned. Check DB_PATH, DEV_HOURS, or whether DB has data.")
+        conn.close()
+        raise RuntimeError(
+            "No data returned for the requested cutoff. "
+            f"Cutoff={effective_cutoff_iso}, latest observed_at in DB={db_max_observed_at}. "
+            "Increase DEV_HOURS, use a newer database snapshot, or set a different cutoff window."
+        )
+
+    conn.close()
 
     mark(f"Loaded rows (raw slice): {len(df):,}")
 
@@ -163,6 +216,7 @@ def main():
     # 9) Label
     df["deviation_from_baseline"] = df["time_to_station"] - df["baseline_median_tts"]
     df["late"] = (df["deviation_from_baseline"] > LATE_THRESHOLD_SECONDS).astype(int)
+    df['late_3min'] = (df['deviation_from_baseline'] > 180).astype(int)
 
     # Drop rows missing baseline (rare with small slices)
     df = df.dropna(subset=["baseline_median_tts"]).copy()
@@ -173,6 +227,7 @@ def main():
         "stop_id",
         "stop_name",
         "line_id",
+        "vehicle_id",
         "direction",
         "platform_name",
         "destination_name",
@@ -183,10 +238,10 @@ def main():
         "roll_mean_tts_10m",
         "roll_max_tts_10m",
         "roll_count_10m",
-        "roll_std_tts_10m",
         "baseline_median_tts",
         "deviation_from_baseline",
         "late",
+        "late_3min",
     ]
     df_out = df[keep_cols].copy()
 
@@ -199,11 +254,11 @@ def main():
     mark(f"Final ML rows: {len(df_out):,}")
 
     # 12) Save outputs
-    df_out.to_parquet(OUT_DATASET_PATH, index=False)
-    baseline.to_parquet(OUT_BASELINE_PATH, index=False)
+    df_out.to_parquet(out_dataset_path, index=False)
+    baseline.to_parquet(out_baseline_path, index=False)
 
-    mark(f"Saved ML dataset: {OUT_DATASET_PATH}")
-    mark(f"Saved baseline table: {OUT_BASELINE_PATH}")
+    mark(f"Saved ML dataset: {out_dataset_path}")
+    mark(f"Saved baseline table: {out_baseline_path}")
     mark("Done.")
 
 

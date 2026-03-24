@@ -148,9 +148,11 @@ dmypy.json
 
 
 data/*.csv
+data/processed/
 models/*.sav
 mlruns
 models/*
+app/artifacts/
 
 #config file has sensitive data
 .mlflow_uri
