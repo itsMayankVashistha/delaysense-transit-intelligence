@@ -1,5 +1,5 @@
 from pathlib import Path
-import joblib
+import pandas as pd
 
 from app.config.settings import (
     BASELINE_TABLE_PATH,
@@ -14,23 +14,48 @@ from app.services.rolling_cache import RollingCache
 from app.services.feature_pipeline import FeaturePipeline
 from app.services.mock_model import MockModel
 from app.services.inference_service import InferenceService
+from app.services.artifact_loader import load_model_artifact
 
 
 def _load_model():
     if FORCE_MOCK_MODEL:
         print("Using mock model because FORCE_MOCK_MODEL=true")
-        return MockModel(), "mock"
+        return MockModel(), "mock", None
+    print(f"Resolved MODEL_PATH: {Path(MODEL_PATH).resolve()}")
+    print(f"MODEL_PATH exists: {Path(MODEL_PATH).exists()}")
 
     if Path(MODEL_PATH).exists():
         try:
-            model = joblib.load(MODEL_PATH)
-            print(f"Loaded real model from: {MODEL_PATH}")
-            return model, "joblib"
-        except Exception as e:
-            print(f"Warning: failed to load model.joblib, falling back to mock model: {e}")
+            artifact = load_model_artifact(MODEL_PATH)
+            print(f"Loaded real model artifact from: {MODEL_PATH}")
+            print(f"Artifact type: {artifact.artifact_type}")
+            print(f"Model name: {artifact.model_name}")
+            print(f"Model family: {artifact.model_family}")
+            print(f"Mode name: {artifact.mode_name}")
+            print(f"Horizon: {artifact.horizon_seconds}")
+            print(f"Input type: {artifact.input_type}")
+            print(f"Threshold: {artifact.threshold}")
+            print(f"Features: {artifact.features}")
 
-    print("Using mock model because no valid model.joblib was found")
-    return MockModel(), "mock"
+            return artifact, "joblib", {
+                "artifact_type": artifact.artifact_type,
+                "model_name": artifact.model_name,
+                "model_family": artifact.model_family,
+                "mode_name": artifact.mode_name,
+                "threshold": artifact.threshold,
+                "horizon_seconds": artifact.horizon_seconds,
+                "features": artifact.features,
+                "input_type": artifact.input_type,
+                "positive_class_index": artifact.positive_class_index,
+                "metadata": artifact.metadata,
+                "feature_contract": artifact.feature_contract,
+                "source_path": artifact.source_path,
+            }
+        except Exception as e:
+            print(f"Warning: failed to load model artifact, falling back to mock model: {e}")
+
+    print("Using mock model because no valid model artifact was found")
+    return MockModel(), "mock", None
 
 
 def _load_intelligence_layer():
@@ -57,15 +82,28 @@ def _load_intelligence_layer():
         return None
 
 
-def _smoke_test_model(model, model_source):
+def _smoke_test_model(model, model_source, model_info=None):
     try:
-        dummy_row = [[0.0 for _ in MODEL_FEATURES]]
-        out = model.predict_proba(dummy_row)
+        if model_source == "mock":
+            dummy_row = [[0.0 for _ in MODEL_FEATURES]]
+            out = model.predict_proba(dummy_row)
+        else:
+            feature_names = (model_info or {}).get("features") or MODEL_FEATURES
+            input_type = ((model_info or {}).get("input_type") or "dataframe").lower()
 
-        if not isinstance(out, (list, tuple)) and not hasattr(out, "__getitem__"):
+            if input_type == "dataframe":
+                X_dummy = pd.DataFrame([{feature: 0.0 for feature in feature_names}])
+            else:
+                X_dummy = [[0.0 for _ in feature_names]]
+
+            out = model.predict_proba(X_dummy)
+
+        if not hasattr(out, "__getitem__"):
             raise ValueError("predict_proba output is not indexable")
 
-        _ = out[0][1]
+        positive_idx = ((model_info or {}).get("positive_class_index", 1))
+        _ = out[0][positive_idx]
+
         print(f"Model smoke test passed for model source: {model_source}")
     except Exception as e:
         raise RuntimeError(f"Model smoke test failed for model source '{model_source}': {e}")
@@ -76,8 +114,8 @@ def create_services():
     rolling_cache = RollingCache(window_minutes=10)
     feature_pipeline = FeaturePipeline(baseline_service, rolling_cache)
 
-    model, model_source = _load_model()
-    _smoke_test_model(model, model_source)
+    model, model_source, model_info = _load_model()
+    _smoke_test_model(model, model_source, model_info)
 
     intelligence_layer = _load_intelligence_layer()
 
@@ -86,6 +124,7 @@ def create_services():
         pipeline=feature_pipeline,
         intelligence_layer=intelligence_layer,
         model_source=model_source,
+        model_info=model_info,
     )
 
     return {
@@ -94,6 +133,7 @@ def create_services():
         "feature_pipeline": feature_pipeline,
         "model": model,
         "model_source": model_source,
+        "model_info": model_info,
         "intelligence_layer": intelligence_layer,
         "inference_service": inference_service,
     }

@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 ARTIFACTS_DIR = BASE_DIR / "app" / "artifacts"
 
 BASELINE_TABLE_PATH = ARTIFACTS_DIR / "baseline_table.parquet"
-MODEL_PATH = ARTIFACTS_DIR / "model.joblib"
+MODEL_PATH = BASE_DIR / "app" / "models" / "lightgbm_v2_h300_balanced.joblib"
 
 MODEL_FEATURES = [
     "hour",
