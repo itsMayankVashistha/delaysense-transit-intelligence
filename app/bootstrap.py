@@ -95,7 +95,9 @@ def _smoke_test_model(model, model_source, model_info=None):
                 X_dummy = pd.DataFrame([{feature: 0.0 for feature in feature_names}])
             else:
                 X_dummy = [[0.0 for _ in feature_names]]
-
+            print(f"Smoke test input type: {type(X_dummy)}")
+            if hasattr(X_dummy, "columns"):
+                print(f"Smoke test columns: {list(X_dummy.columns)}")
             out = model.predict_proba(X_dummy)
 
         if not hasattr(out, "__getitem__"):
