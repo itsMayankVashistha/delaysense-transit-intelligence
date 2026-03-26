@@ -55,31 +55,42 @@ class InferenceService:
         return float(ALERT_MODES[alert_mode]["alert_threshold"])
 
     def _format_minutes_value(self, minutes):
-        return f"{minutes:.1f}"
+        total_seconds = int(round(minutes * 60))
+
+        if total_seconds < 60:
+            return f"{total_seconds}s"
+
+        mins = total_seconds // 60
+        secs = total_seconds % 60
+
+        if secs == 0:
+            return f"{mins}m"
+
+        return f"{mins}m {secs}s"
 
     def _build_user_explanation(self, feat, prob, risk):
-        current_min = feat["time_to_station"] / 60
-        baseline_min = feat["baseline_median_tts"] / 60
-        deviation_min = feat["deviation_from_baseline"] / 60
+        current_time = self._format_minutes_value(feat["time_to_station"] / 60)
+        baseline_time = self._format_minutes_value(feat["baseline_median_tts"] / 60)
+        deviation_time = self._format_minutes_value(abs(feat["deviation_from_baseline"]) / 60)
 
         if risk == "high":
             return (
-                f"Current arrival estimate is {self._format_minutes_value(current_min)} minutes, "
-                f"which is {self._format_minutes_value(deviation_min)} minutes above the usual "
-                f"{self._format_minutes_value(baseline_min)} minutes for this context. "
+                f"Current arrival estimate is {current_time}, "
+                f"which is {deviation_time} above the usual "
+                f"{baseline_time} for this context. "
                 f"The system flags this as high delay risk."
             )
 
         if risk == "medium":
             return (
-                f"Current arrival estimate is {self._format_minutes_value(current_min)} minutes, "
-                f"which is above the usual {self._format_minutes_value(baseline_min)} minutes. "
+                f"Current arrival estimate is {current_time}, "
+                f"which is above the usual {baseline_time}. "
                 f"The system detects elevated delay risk."
             )
 
         return (
-            f"Current arrival estimate is {self._format_minutes_value(current_min)} minutes, "
-            f"which is close to the usual {self._format_minutes_value(baseline_min)} minutes. "
+            f"Current arrival estimate is {current_time}, "
+            f"which is close to the usual {baseline_time}. "
             f"The system considers delay risk low."
         )
 
