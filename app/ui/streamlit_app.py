@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 import base64
 import json
 
@@ -173,11 +174,11 @@ st.markdown(
         position: relative;
         z-index: 2;
         padding: 1.8rem 2rem;
-        max-width: 720px;
+        max-width: 760px;
     }}
 
     .hero-title-overlay {{
-        font-size: 2.3rem;
+        font-size: 2.35rem;
         font-weight: 900;
         color: white;
         line-height: 1.05;
@@ -360,15 +361,15 @@ def render_hero():
                 <div class="hero-content">
                     <div class="hero-title-overlay">TfL Delay Intelligence</div>
                     <div class="hero-sub-overlay">
-                        Early warning dashboard for London Underground arrival delays
+                        Real-time early warning for London Underground arrivals
                     </div>
                     <div class="hero-sub-overlay">
-                        Forecasting-driven monitoring for current arrival risk
+                        Live monitoring, short-horizon delay risk, and context-aware arrival intelligence
                     </div>
                     <div class="hero-tag-row">
-                        <span class="hero-tag">Real-time monitoring</span>
-                        <span class="hero-tag">Risk alerts</span>
-                        <span class="hero-tag">ML-powered</span>
+                        <span class="hero-tag">Live monitor</span>
+                        <span class="hero-tag">Rolling context</span>
+                        <span class="hero-tag">Forecasting-driven</span>
                     </div>
                 </div>
             </div>
@@ -381,7 +382,7 @@ def render_hero():
             <div class="panel">
                 <div class="section-title" style="font-size:2rem; margin-bottom:0.2rem;">TfL Delay Intelligence</div>
                 <div style="color:#667085; font-size:1rem;">
-                    Early warning dashboard for London Underground arrival delays
+                    Real-time early warning dashboard for London Underground arrivals
                 </div>
             </div>
             """,
@@ -414,16 +415,14 @@ def predict_case(case, mode, include_intelligence):
     return response.json()
 
 
-def fetch_live_monitoring(mode, include_intelligence, max_per_stop=3):
-    response = requests.get(
-        f"{API_URL}/monitor/live",
-        params={
-            "max_per_stop": max_per_stop,
-            "alert_mode": mode,
-            "include_intelligence": include_intelligence,
-        },
-        timeout=40,
-    )
+def fetch_live_monitoring():
+    response = requests.get(f"{API_URL}/monitor/live", timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+
+def manual_refresh_live_monitor():
+    response = requests.post(f"{API_URL}/monitor/refresh", timeout=25)
     response.raise_for_status()
     return response.json()
 
@@ -436,6 +435,7 @@ def load_sample_monitoring(mode, include_intelligence):
         "source": "sample",
         "count": len(results),
         "results": results,
+        "status": None,
     }
 
 
@@ -452,6 +452,16 @@ def format_seconds_human(seconds):
         return f"{mins}m"
 
     return f"{mins}m {secs}s"
+
+
+def parse_iso_to_local_string(value):
+    if not value:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt.strftime("%H:%M:%S")
+    except Exception:
+        return str(value)
 
 
 def apply_plot_style(fig):
@@ -505,8 +515,7 @@ def fig_current_vs_usual(current_sec, usual_sec):
         marker_line_width=0,
         hovertemplate="%{x}: %{y:.1f} min<extra></extra>",
     )
-    fig = apply_plot_style(fig)
-    return fig
+    return apply_plot_style(fig)
 
 
 def fig_delay_signal(threshold_value, prob):
@@ -536,8 +545,7 @@ def fig_delay_signal(threshold_value, prob):
         hovertemplate="%{x}: %{y:.0%}<extra></extra>",
     )
     fig.update_yaxes(range=[0, 1], tickformat=".0%")
-    fig = apply_plot_style(fig)
-    return fig
+    return apply_plot_style(fig)
 
 
 def fig_likelihood_across_arrivals(monitor_results):
@@ -577,8 +585,120 @@ def fig_likelihood_across_arrivals(monitor_results):
         hovertemplate="%{y}: %{x:.0%}<extra></extra>",
     )
     fig.update_xaxes(range=[0, 1], tickformat=".0%")
-    fig = apply_plot_style(fig)
-    return fig
+    return apply_plot_style(fig)
+
+
+def fig_network_snapshot(monitor_results):
+    rows = []
+    for r in monitor_results:
+        features = r["features"]
+        display = r["display"]
+        rows.append(
+            {
+                "Station": display["stop_name"],
+                "CurrentArrivalMin": float(features["time_to_station"]) / 60.0,
+                "DelayLikelihood": float(r["prob"]),
+                "ExtraDelayMin": max(0.0, float(features["deviation_from_baseline"]) / 60.0),
+                "Risk": str(r["risk"]).upper(),
+            }
+        )
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return None
+
+    fig = px.scatter(
+        df,
+        x="CurrentArrivalMin",
+        y="DelayLikelihood",
+        size="ExtraDelayMin",
+        color="Risk",
+        hover_name="Station",
+        size_max=34,
+        color_discrete_map={
+            "HIGH": COLORS["high"],
+            "MEDIUM": COLORS["medium"],
+            "LOW": COLORS["low"],
+        },
+    )
+    fig.update_traces(
+        marker=dict(line=dict(width=1, color="rgba(255,255,255,0.8)")),
+        hovertemplate=(
+            "<b>%{hovertext}</b><br>"
+            "Current arrival: %{x:.1f} min<br>"
+            "Delay likelihood: %{y:.0%}<br>"
+            "<extra></extra>"
+        ),
+    )
+    fig.update_yaxes(range=[0, 1], tickformat=".0%")
+    fig.update_xaxes(title="Current arrival (min)")
+    return apply_plot_style(fig)
+
+
+def append_live_history(monitor_results, monitor_status):
+    if "live_history" not in st.session_state:
+        st.session_state["live_history"] = []
+
+    ts = monitor_status.get("last_success_at") or monitor_status.get("last_poll_at")
+    if not ts:
+        return
+
+    existing_keys = {
+        (item["timestamp"], item["station"])
+        for item in st.session_state["live_history"]
+    }
+
+    for r in monitor_results:
+        station = r["display"]["stop_name"]
+        key = (ts, station)
+        if key in existing_keys:
+            continue
+
+        features = r["features"]
+        st.session_state["live_history"].append(
+            {
+                "timestamp": ts,
+                "station": station,
+                "prob": float(r["prob"]),
+                "current_arrival_min": float(features["time_to_station"]) / 60.0,
+                "usual_arrival_min": float(features["baseline_median_tts"]) / 60.0,
+                "extra_delay_min": float(features["deviation_from_baseline"]) / 60.0,
+                "risk": str(r["risk"]).upper(),
+            }
+        )
+
+    st.session_state["live_history"] = st.session_state["live_history"][-500:]
+
+
+def fig_selected_station_trend(selected_station):
+    history = st.session_state.get("live_history", [])
+    if not history:
+        return None
+
+    df = pd.DataFrame(history)
+    if df.empty:
+        return None
+
+    df = df[df["station"] == selected_station].copy()
+    if df.empty or len(df) < 2:
+        return None
+
+    df["timestamp_dt"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = df.sort_values("timestamp_dt")
+
+    fig = px.line(
+        df,
+        x="timestamp_dt",
+        y="prob",
+        markers=True,
+    )
+    fig.update_traces(
+        line=dict(width=3),
+        hovertemplate="%{x|%H:%M:%S}<br>Delay likelihood: %{y:.0%}<extra></extra>",
+    )
+    fig.update_yaxes(range=[0, 1], tickformat=".0%")
+    fig.update_xaxes(title=None)
+    return apply_plot_style(fig)
 
 
 def build_monitoring_table(results):
@@ -641,7 +761,7 @@ with top_left:
     data_source = st.radio(
         "Monitoring source",
         ["Sample demo", "Live TfL"],
-        index=0,
+        index=1,
         horizontal=True,
     )
 
@@ -657,20 +777,13 @@ with top_left:
         value=False,
     )
 
-    max_per_stop = 3
-    if data_source == "Live TfL":
-        max_per_stop = st.slider(
-            "Live arrivals per monitored station",
-            min_value=1,
-            max_value=5,
-            value=3,
-        )
-
-    b1, b2 = st.columns(2)
-    with b1:
+    c1, c2, c3 = st.columns(3)
+    with c1:
         check_api = st.button("Check API", use_container_width=True)
-    with b2:
+    with c2:
         load_monitoring = st.button("Load Monitoring View", use_container_width=True)
+    with c3:
+        refresh_live = st.button("Refresh Live Now", use_container_width=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -725,15 +838,15 @@ with top_right:
 monitor_results = None
 monitor_df = None
 prediction_error = None
+monitor_status = None
 
-if load_monitoring:
+if load_monitoring or refresh_live:
     try:
         if data_source == "Live TfL":
-            monitoring_payload = fetch_live_monitoring(
-                selected_mode,
-                include_intelligence,
-                max_per_stop=max_per_stop,
-            )
+            if refresh_live:
+                monitoring_payload = manual_refresh_live_monitor()
+            else:
+                monitoring_payload = fetch_live_monitoring()
         else:
             monitoring_payload = load_sample_monitoring(
                 selected_mode,
@@ -741,6 +854,7 @@ if load_monitoring:
             )
 
         results = monitoring_payload.get("results", [])
+        monitor_status = monitoring_payload.get("status")
 
         if not results:
             raise ValueError("No arrivals were returned for the selected monitoring source.")
@@ -752,6 +866,10 @@ if load_monitoring:
         st.session_state["monitor_count"] = monitoring_payload.get("count", len(results))
         st.session_state["selected_mode"] = selected_mode
         st.session_state["data_source"] = data_source
+        st.session_state["monitor_status"] = monitor_status
+
+        if data_source == "Live TfL" and monitor_status:
+            append_live_history(results, monitor_status)
 
     except Exception as e:
         prediction_error = str(e)
@@ -761,6 +879,9 @@ if "monitor_results" in st.session_state:
 
 if "monitor_df" in st.session_state:
     monitor_df = st.session_state["monitor_df"]
+
+if "monitor_status" in st.session_state:
+    monitor_status = st.session_state["monitor_status"]
 
 if prediction_error:
     st.error(f"Prediction failed: {prediction_error}")
@@ -782,6 +903,38 @@ if monitor_df is not None and monitor_results is not None:
         render_summary_chip("Average likelihood", f"{avg_likelihood:.0%}", "Across monitored arrivals")
     with summary_cols[3]:
         render_summary_chip("Model source", str(model_source), "Current backend")
+
+    if source_label.startswith("tfl_live") and monitor_status:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Live monitor status</div>', unsafe_allow_html=True)
+
+        live_cols = st.columns(4)
+        with live_cols[0]:
+            render_summary_chip(
+                "Monitor",
+                "Running" if monitor_status.get("is_running") else "Stopped",
+                f'Poll every {monitor_status.get("poll_interval_seconds", "—")}s',
+            )
+        with live_cols[1]:
+            render_summary_chip(
+                "Rolling context",
+                str(monitor_status.get("warmup_status", "unknown")).title(),
+                f'{monitor_status.get("warmup_minutes", 0)} min warm-up',
+            )
+        with live_cols[2]:
+            render_summary_chip(
+                "Last update",
+                parse_iso_to_local_string(monitor_status.get("last_success_at")),
+                "Latest successful poll",
+            )
+        with live_cols[3]:
+            render_summary_chip(
+                "Poll count",
+                str(monitor_status.get("poll_count", 0)),
+                "Background cycles completed",
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     table_col, side_col = st.columns([1.35, 0.65])
 
@@ -818,7 +971,7 @@ if monitor_df is not None and monitor_results is not None:
         selected_prob = float(selected_result["prob"])
         selected_alert = selected_result["alert_flag"]
         selected_risk = str(selected_result["risk"]).upper()
-        source_display = "Live TfL" if source_label == "tfl_live" else "Sample demo"
+        source_display = "Live TfL" if source_label.startswith("tfl_live") else "Sample demo"
 
         st.markdown(
             f"""
@@ -853,7 +1006,7 @@ if monitor_df is not None and monitor_results is not None:
     current_sec = float(features["time_to_station"])
     usual_sec = float(features["baseline_median_tts"])
     extra_delay_sec = current_sec - usual_sec
-    source_display = "Live TfL" if source_label == "tfl_live" else "Sample demo"
+    source_display = "Live TfL" if source_label.startswith("tfl_live") else "Sample demo"
 
     st.markdown(
         f"""
@@ -942,13 +1095,38 @@ if monitor_df is not None and monitor_results is not None:
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Likelihood across monitored arrivals</div>', unsafe_allow_html=True)
-    st.plotly_chart(
-        fig_likelihood_across_arrivals(monitor_results),
-        use_container_width=True,
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+    lower_col1, lower_col2 = st.columns(2)
+
+    with lower_col1:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Likelihood across monitored arrivals</div>', unsafe_allow_html=True)
+        st.plotly_chart(
+            fig_likelihood_across_arrivals(monitor_results),
+            use_container_width=True,
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with lower_col2:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Live network snapshot</div>', unsafe_allow_html=True)
+        snapshot_fig = fig_network_snapshot(monitor_results)
+        if snapshot_fig is not None:
+            st.plotly_chart(snapshot_fig, use_container_width=True)
+        else:
+            st.info("No snapshot data available.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if source_label.startswith("tfl_live"):
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Selected arrival trend</div>', unsafe_allow_html=True)
+
+        trend_fig = fig_selected_station_trend(st.session_state["selected_station"])
+        if trend_fig is not None:
+            st.plotly_chart(trend_fig, use_container_width=True)
+        else:
+            st.info("Trend becomes visible after a few live refreshes for the selected station.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     if result.get("intelligence"):
         intelligence = result["intelligence"]
@@ -979,7 +1157,8 @@ else:
         <div class="panel">
             <div class="empty-state">
                 Click <strong>Load Monitoring View</strong> to load either the sample demo set
-                or live TfL arrivals, compare delay likelihoods across stations, and inspect one case in detail.
+                or the current live TfL monitor state, compare delay likelihoods across stations,
+                and inspect one arrival in detail.
             </div>
         </div>
         """,
