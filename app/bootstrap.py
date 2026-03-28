@@ -15,6 +15,8 @@ from app.services.feature_pipeline import FeaturePipeline
 from app.services.mock_model import MockModel
 from app.services.inference_service import InferenceService
 from app.services.artifact_loader import load_model_artifact
+from app.services.tfl_api_service import TfLApiService, DEFAULT_MONITORED_STOPS
+from app.services.live_monitor_manager import LiveMonitorManager
 
 
 def _load_model():
@@ -129,6 +131,18 @@ def create_services():
         model_info=model_info,
     )
 
+    tfl_api_service = TfLApiService()
+
+    live_monitor_manager = LiveMonitorManager(
+        tfl_api_service=tfl_api_service,
+        inference_service=inference_service,
+        monitored_stop_ids=list(DEFAULT_MONITORED_STOPS.keys()),
+        poll_interval_seconds=30,
+        max_per_stop=3,
+        default_alert_mode="Balanced",
+        include_intelligence=False,
+    )
+
     return {
         "baseline_service": baseline_service,
         "rolling_cache": rolling_cache,
@@ -138,4 +152,6 @@ def create_services():
         "model_info": model_info,
         "intelligence_layer": intelligence_layer,
         "inference_service": inference_service,
+        "tfl_api_service": tfl_api_service,
+        "live_monitor_manager": live_monitor_manager,
     }

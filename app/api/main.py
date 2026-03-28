@@ -1,16 +1,32 @@
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from app.bootstrap import create_services
-from app.services.tfl_api_service import TfLApiService, DEFAULT_MONITORED_STOPS
-
-app = FastAPI(title="TfL Delay Intelligence API")
+from app.services.tfl_api_service import DEFAULT_MONITORED_STOPS
 
 services = create_services()
 inference_service = services["inference_service"]
-tfl_api_service = TfLApiService()
+live_monitor_manager = services["live_monitor_manager"]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Starting background live monitor manager...")
+    live_monitor_manager.start()
+    try:
+        yield
+    finally:
+        print("Stopping background live monitor manager...")
+        live_monitor_manager.stop()
+
+
+app = FastAPI(
+    title="TfL Delay Intelligence API",
+    lifespan=lifespan,
+)
 
 
 class PredictRequest(BaseModel):
@@ -41,6 +57,7 @@ def health():
         "model_source": services["model_source"],
         "intelligence_enabled": services["intelligence_layer"] is not None,
         "model_info": services.get("model_info"),
+        "monitor_status": live_monitor_manager.get_status(),
         "default_monitored_stops": DEFAULT_MONITORED_STOPS,
     }
 
@@ -75,54 +92,33 @@ def predict(req: PredictRequest):
 
 
 @app.get("/monitor/live")
-def monitor_live(
-    max_per_stop: int = 3,
-    alert_mode: Optional[str] = None,
-    include_intelligence: bool = True,
-):
-    rows = tfl_api_service.fetch_demo_monitored_arrivals(
-        stop_ids=list(DEFAULT_MONITORED_STOPS.keys()),
-        max_per_stop=max_per_stop,
-    )
-
-    predictions = [
-        inference_service.predict(
-            row,
-            alert_mode=alert_mode,
-            include_intelligence=include_intelligence,
-        )
-        for row in rows
-    ]
+def monitor_live():
+    results = live_monitor_manager.get_latest_results()
+    status = live_monitor_manager.get_status()
 
     return {
         "source": "tfl_live",
-        "count": len(predictions),
+        "count": len(results),
+        "status": status,
         "monitored_stops": DEFAULT_MONITORED_STOPS,
-        "results": predictions,
+        "results": results,
     }
 
 
-@app.post("/monitor/live")
-def monitor_live_post(req: LiveMonitorRequest):
-    stop_ids = req.stop_ids or list(DEFAULT_MONITORED_STOPS.keys())
+@app.get("/monitor/status")
+def monitor_status():
+    return live_monitor_manager.get_status()
 
-    rows = tfl_api_service.fetch_arrivals_for_stops(
-        stop_ids=stop_ids,
-        max_per_stop=req.max_per_stop,
-    )
 
-    predictions = [
-        inference_service.predict(
-            row,
-            alert_mode=req.alert_mode,
-            include_intelligence=req.include_intelligence,
-        )
-        for row in rows
-    ]
+@app.post("/monitor/refresh")
+def monitor_refresh():
+    live_monitor_manager.poll_once()
+    results = live_monitor_manager.get_latest_results()
+    status = live_monitor_manager.get_status()
 
     return {
-        "source": "tfl_live",
-        "count": len(predictions),
-        "requested_stop_ids": stop_ids,
-        "results": predictions,
+        "source": "tfl_live_manual_refresh",
+        "count": len(results),
+        "status": status,
+        "results": results,
     }
