@@ -368,8 +368,8 @@ def render_hero():
                     </div>
                     <div class="hero-tag-row">
                         <span class="hero-tag">Live monitor</span>
-                        <span class="hero-tag">Rolling context</span>
-                        <span class="hero-tag">Forecasting-driven</span>
+                        <span class="hero-tag">Risk analysis</span>
+                        <span class="hero-tag">Early warning intelligence</span>
                     </div>
                 </div>
             </div>
@@ -773,7 +773,7 @@ with top_left:
     )
 
     include_intelligence = st.checkbox(
-        "Show additional context",
+        "Show advanced details",
         value=False,
     )
 
@@ -781,9 +781,9 @@ with top_left:
     with c1:
         check_api = st.button("Check API", use_container_width=True)
     with c2:
-        load_monitoring = st.button("Load Monitoring View", use_container_width=True)
+        load_monitoring = st.button("Start Monitoring", use_container_width=True)
     with c3:
-        refresh_live = st.button("Refresh Live Now", use_container_width=True)
+        refresh_live = st.button("Refresh Data", use_container_width=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -822,7 +822,7 @@ with top_right:
         )
     with c4:
         render_small_card(
-            "Context",
+            "Advanced insights",
             "On" if (health_data and health_data.get("intelligence_enabled")) else "Off",
             "Optional enrichment",
         )

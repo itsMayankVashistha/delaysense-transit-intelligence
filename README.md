@@ -73,23 +73,9 @@ So the dataset contains:
 
 This distinction is critical to understanding both the dataset and the modeling approach.
 
----
 
-## ❌ Old Approach We Moved Away From
 
-An earlier formulation tried to predict whether an arrival was currently late at the same timestamp.
-
-That approach was weak because present-state features were too closely linked to the label. In particular:
-
-- `deviation_from_baseline` is directly tied to `time_to_station`
-- rolling features can leak present-state information
-- the model can end up reconstructing the current rule rather than forecasting future delay risk
-
-This is **not** the final framing of the project.
-
----
-
-## ✅ Current Approach: Forecasting / Early Warning (Path B)
+## ✅ Current Approach: Forecasting / Early Warning
 
 The project now uses a **future-horizon forecasting setup**.
 
