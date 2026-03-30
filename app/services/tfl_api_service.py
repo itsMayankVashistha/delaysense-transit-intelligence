@@ -53,7 +53,7 @@ class TfLApiService:
         stop_id = item.get("naptanId") or fallback_stop_id
         stop_name = item.get("stationName") or DEFAULT_MONITORED_STOPS.get(stop_id) or "Unknown station"
 
-        direction = (item.get("direction") or "unknown").lower()
+        direction = (item.get("direction") or "-").lower()
         platform_name = item.get("platformName") or "Unknown platform"
         destination_name = item.get("destinationName") or "Unknown destination"
 
