@@ -71,26 +71,31 @@ class InferenceService:
     def _build_user_explanation(self, feat, prob, risk):
         current_time = self._format_minutes_value(feat["time_to_station"] / 60)
         baseline_time = self._format_minutes_value(feat["baseline_median_tts"] / 60)
-        deviation_time = self._format_minutes_value(abs(feat["deviation_from_baseline"]) / 60)
+        deviation_seconds = float(feat["deviation_from_baseline"])
+
+        if abs(deviation_seconds) < 1:
+            comparison_text = f"which is very close to the usual {baseline_time}"
+        elif deviation_seconds > 0:
+            deviation_time = self._format_minutes_value(abs(deviation_seconds) / 60)
+            comparison_text = f"which is {deviation_time} slower than the usual {baseline_time}"
+        else:
+            deviation_time = self._format_minutes_value(abs(deviation_seconds) / 60)
+            comparison_text = f"which is {deviation_time} faster than the usual {baseline_time}"
 
         if risk == "high":
             return (
-                f"Current arrival estimate is {current_time}, "
-                f"which is {deviation_time} above the usual "
-                f"{baseline_time} for this context. "
+                f"Current arrival estimate is {current_time}, {comparison_text}. "
                 f"The system flags this as high delay risk."
             )
 
         if risk == "medium":
             return (
-                f"Current arrival estimate is {current_time}, "
-                f"which is above the usual {baseline_time}. "
+                f"Current arrival estimate is {current_time}, {comparison_text}. "
                 f"The system detects elevated delay risk."
             )
 
         return (
-            f"Current arrival estimate is {current_time}, "
-            f"which is close to the usual {baseline_time}. "
+            f"Current arrival estimate is {current_time}, {comparison_text}. "
             f"The system considers delay risk low."
         )
 
