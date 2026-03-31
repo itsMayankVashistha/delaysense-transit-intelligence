@@ -738,7 +738,8 @@ def parse_iso_to_local_string(value):
         return "—"
     try:
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return dt.strftime("%H:%M:%S")
+        dt_local = dt.astimezone()   # convert to local machine timezone
+        return dt_local.strftime("%H:%M:%S")
     except Exception:
         return str(value)
 
