@@ -1,376 +1,319 @@
-# 🚇 TfL Delay Intelligence  
-## Real-Time Tube Delay Early Warning System
+# 🚇 TfL Delay Intelligence
 
-A forecasting-based machine learning system for monitoring London Underground arrival predictions and identifying short-term delay risk in real time.
+### Real-Time Tube Delay Early Warning System
 
-This capstone project uses live Transport for London (TfL) arrival data, builds a historical dataset from repeated API snapshots, engineers time-aware features, trains forecasting-style ML models, and serves predictions through a FastAPI backend and Streamlit dashboard.
-
----
-
-## 📌 Project Summary
-
-This project focuses on **London Underground arrival prediction monitoring** for the **Victoria** and **Jubilee** lines.
-
-Instead of predicting whether a train is currently delayed using present-state features, the system uses a **forecasting-style early warning setup**:
-
-> At time **t**, predict whether the arrival context will be delayed at time **t + H**
-
-For example:
-
-- at **23:05**, predict whether the train context will be late at **23:10**
-
-This makes the project an **early warning system**, not a naive current-state classifier.
-
-The system now supports:
-
-- live TfL arrival fetching
-- baseline-aware feature generation
-- rolling-window live feature updates
-- trained ML model integration via `.joblib`
-- FastAPI prediction endpoints
-- Streamlit monitoring dashboard
-- optional intelligence / historical-context layer
+An end-to-end machine learning system that transforms live London Underground arrival data into **proactive delay risk intelligence**.
 
 ---
 
-## 🎯 Current Scope
+## 🌟 Overview
 
-### Transport mode
-- London Underground (Tube)
+TfL Delay Intelligence is a **real-time monitoring and early-warning system** designed to identify which train arrivals are most likely to become delayed in the next few minutes.
 
-### Lines
-- Victoria
-- Jubilee
+Instead of answering:
 
-### Core capabilities
-- collect live TfL arrival prediction snapshots
-- store raw data in SQLite
-- build a processed historical dataset in Parquet
-- engineer spatiotemporal and rolling features
-- generate future forecasting targets
-- train time-aware ML models
-- serve predictions through FastAPI
-- visualize monitored arrivals in Streamlit
-- support both sample demo mode and live TfL mode
+> “When is the train arriving?”
+
+This system answers:
+
+> **“Which arrivals are at risk of becoming problematic next?”**
 
 ---
 
-## 🧠 Problem Framing
+## 🎯 What This Project Demonstrates
 
-### What one row represents
+This project is not just a model — it is a **full ML product system**:
 
-A row in the dataset is **not** a train, trip, or event.
+* 🔄 Real-time TfL API ingestion
+* 🧠 Context-aware feature engineering (rolling + baseline)
+* 📈 Forecasting-based ML predictions
+* ⚙️ FastAPI backend for inference + monitoring
+* 🖥 Streamlit dashboard for product interaction
+* 🧩 Artifact-based ML deployment (joblib + metadata)
 
-Each row is:
-
-> **one API snapshot of one arrival prediction at poll time**
-
-So the dataset contains:
-
-- repeated rows for the same vehicle over time
-- repeated prediction sequences
-- many snapshots for the same arrival context
-
-This distinction is critical to understanding both the dataset and the modeling approach.
-
-
-
-## ✅ Current Approach: Forecasting / Early Warning
-
-The project now uses a **future-horizon forecasting setup**.
-
-At time **t**, the system predicts whether the same arrival context will be delayed at time **t + H**.
-
-Example target horizons include:
-
-- `future_late_3min_120s`
-- `future_late_3min_300s`
-- `future_late_3min_1800s`
-
-The current preferred deployment horizon is:
-
-- **300 seconds (5 minutes)**
-
-This framing makes the system useful as an operational early warning product rather than a present-state detector.
+👉 A complete pipeline from **raw data → deployed monitoring system**
 
 ---
 
-## 🧱 Data Pipeline Overview
+## 🧠 Problem Statement
 
-### 1. Live ingestion
-- TfL Arrivals API polled approximately every 30 seconds
-- raw prediction snapshots stored in SQLite
+TfL provides arrival predictions like:
 
-### 2. Dataset construction
-- raw snapshots converted into a processed Parquet dataset
-- contextual and rolling features engineered
-- future labels generated for forecasting horizons
+> “Train arrives in 5 minutes”
 
-### 3. Model training
-- time-aware train / validation / test split
-- multiple models trained and evaluated
-- artifact packaging for deployment
+But this lacks context:
 
-### 4. Inference & monitoring
-- FastAPI backend loads trained joblib artifacts
-- Streamlit dashboard displays monitored arrivals
-- optional intelligence layer provides extra context
+* Is 5 minutes normal?
+* Is it trending worse?
+* Should this be monitored?
 
 ---
 
-## 🏗 Current Architecture
+## 💡 Solution
 
-### Backend
-- **FastAPI**
-- prediction endpoints
-- live monitoring endpoint
-- artifact-aware model loading
-- optional intelligence layer
+For each arrival, the system computes:
 
-### Frontend
-- **Streamlit dashboard**
-- monitoring overview
-- selected-arrival inspection
-- delay likelihood charts
-- sample demo mode + live TfL mode
+👉 **Delay likelihood (0–1)**
 
-### ML / inference services
-- baseline lookup service
-- rolling cache
-- feature pipeline
-- inference service
-- model artifact loader
-- optional intelligence layer
+> Probability that the arrival will become delayed in the next 5 minutes
+
+This enables:
+
+* early warning
+* prioritization
+* operational awareness
+
+---
+
+## 🔮 Forecasting Approach
+
+At time `t`, predict delay at `t + H`.
+
+Example:
+
+* At 23:05 → predict delay at 23:10
+
+This makes the system:
+
+* proactive ✔️
+* realistic ✔️
+* operationally useful ✔️
+
+---
+
+## ⚙️ System Architecture
+
+<p align="center">
+  <img src="images/architecture_overview.png" width="900">
+</p>
+
+<p align="center">
+  <em>End-to-end architecture of the TfL Delay Intelligence system</em>
+</p>
+
+The system consists of 5 layers:
+
+### 1. Live Data Layer
+
+* TfL Arrivals API (30s polling)
+
+### 2. Historical Data Layer
+
+* SQLite → Parquet datasets
+
+### 3. Context Layer
+
+* rolling 10-min features
+* baseline lookup
+
+### 4. ML Layer
+
+* probability-based delay prediction
+
+### 5. Product Layer
+
+* FastAPI backend
+* Streamlit dashboard
+
+---
+
+## 🔄 End-to-End Workflow
+
+### 1. Data Collection
+
+```bash
+python scripts/collect_arrivals.py
+```
+
+* polls TfL API
+* stores snapshots in SQLite
+
+---
+
+### 2. Dataset Construction
+
+```bash
+python scripts/build_dataset.py
+```
+
+* builds Parquet dataset
+* creates rolling features
+* generates forecasting targets
+
+---
+
+### 3. Model Training
+
+```bash
+python modeling/train.py
+```
+
+* trains models with time-aware split
+
+---
+
+### 4. Model Validation
+
+```bash
+python modeling/validate_model_artifact.py <model_path>
+```
+
+* ensures compatibility with inference layer
+
+---
+
+### 5. Run Backend
+
+```bash
+python -m uvicorn app.api.main:app --reload
+```
+
+---
+
+### 6. Run Dashboard
+
+```bash
+streamlit run app/ui/streamlit_app.py
+```
+
+---
+
+## 🧩 Model Artifacts & Versioning
+
+Multiple model variants are supported:
+
+* LightGBM (v2, horizon 300s)
+* XGBoost variants
+
+Artifacts include:
+
+* model
+* feature contract
+* metadata
+* input type
+* threshold info
+
+Active model is defined in:
+
+```python
+app/config/settings.py
+```
+
+---
+
+## 🎭 Demo Mode vs 🌍 Live Mode
+
+### 🎭 Demo Mode
+
+* curated scenarios
+* strong visual storytelling
+
+### 🌍 Live Mode
+
+* real-time TfL data
+* reflects actual network conditions
+
+👉 Both modes use the same model and logic — only data differs.
+
+---
+
+## ⏳ Live Context & Rolling Features
+
+* system stores recent arrivals in memory
+* rolling features computed over ~10 minutes
+
+### Warm-up behavior
+
+* first few minutes → limited context
+* after ~10 minutes → stable predictions
+
+---
+
+## 📊 Dataset & Features
+
+Each row =
+
+> one API snapshot of one arrival prediction
+
+### Key features
+
+* `time_to_station`
+* rolling stats (10 min)
+* baseline median
+* deviation from baseline
+* temporal features
+
+---
+
+## 🤖 Models
+
+Models explored:
+
+* Logistic Regression
+* Random Forest
+* LightGBM
+* XGBoost
+
+Current deployed model:
+
+👉 **LightGBM (5-min horizon)**
+
+---
+
+## 🌐 API Endpoints
+
+### Health
+
+```http
+GET /health
+```
+
+### Predict
+
+```http
+POST /predict
+```
+
+### Sample
+
+```http
+GET /sample
+```
+
+### Live Monitoring
+
+```http
+GET /monitor/live
+```
+
+---
+
+## 🖥 Dashboard Features
+
+* monitored arrivals table
+* delay likelihood (%)
+* risk prioritization
+* selected arrival deep dive
+* trend visualization
+* explanation layer
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-capstone_project/
-│
-├── app/
-│   ├── api/
-│   │   └── main.py
-│   ├── config/
-│   │   └── settings.py
-│   ├── models/
-│   │   └── *.joblib
-│   ├── services/
-│   │   ├── artifact_loader.py
-│   │   ├── baseline_service.py
-│   │   ├── feature_pipeline.py
-│   │   ├── inference_service.py
-│   │   ├── mock_model.py
-│   │   ├── rolling_cache.py
-│   │   ├── tfl_api_service.py
-│   │   └── intelligence_layer.py   # optional
-│   ├── ui/
-│   │   └── assets/
-│   └── bootstrap.py
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── data.parquet
-│
-├── scripts/
-│   ├── fetch_stations.py
-│   ├── collect_arrivals.py
-│   ├── backup_sqlite.py
-│   ├── check_db.py
-│   └── build_dataset.py
-│
-├── modeling/
-│   ├── train.py
-│   ├── predict.py
-│   ├── feature_engineering.py
-│   ├── config.py
-│   └── validate_model_artifact.py
-│
-├── notebooks/
-├── requirements.txt
-├── README.md
-└── .env
-````
-
----
-
-## 📊 Dataset and Feature Logic
-
-### Example raw / engineered columns
-
-* `observed_at`
-* `stop_id`
-* `stop_name`
-* `line_id`
-* `vehicle_id`
-* `direction`
-* `platform_name`
-* `destination_name`
-* `hour`
-* `weekday`
-* `is_weekend`
-* `time_to_station`
-* `roll_mean_tts_10m`
-* `roll_max_tts_10m`
-* `roll_count_10m`
-* `baseline_median_tts`
-* `deviation_from_baseline`
-* `late`
-* `late_3min`
-
-### Current deployed feature contract
-
-The current inference layer expects the following model feature set:
-
-* `hour`
-* `weekday`
-* `is_weekend`
-* `time_to_station`
-* `roll_mean_tts_10m`
-* `roll_max_tts_10m`
-* `roll_count_10m`
-* `baseline_median_tts`
-* `deviation_from_baseline`
-
----
-
-## 🔀 Run Segmentation and Future Labels
-
-Because API snapshots are continuous over time, separate prediction runs are identified using grouped contexts such as:
-
-* `vehicle_id`
-* `stop_id`
-* `direction`
-* `destination_name`
-
-A new run is created when the time gap exceeds 300 seconds.
-
-Future labels are then created by matching each row to a future row within the same run using a time-shifted lookup approach.
-
-This allows targets such as:
-
-* “will this arrival context be late 5 minutes from now?”
-
----
-
-## ⏱ Time-Aware Validation
-
-The project does **not** use random train/test splitting.
-
-Instead, it uses a **chronological split**:
-
-* train: earliest 70%
-* validation: next 15%
-* test: final 15%
-
-This is essential for realistic evaluation in time-dependent data.
-
----
-
-## 🤖 Models Used
-
-Models explored include:
-
-* Logistic Regression
-* Random Forest
-* LightGBM
-* XGBoost artifacts received for deployment comparison
-
-The current deployment setup supports loading packaged model artifacts with metadata and feature contract information.
-
-The currently integrated real-model path uses a **LightGBM-based 300-second horizon artifact**.
-
----
-
-## 🧾 Model Artifact Handoff
-
-The deployment layer supports model artifacts that include:
-
-* `.joblib` model package
-* metadata
-* feature list / feature contract
-* horizon information
-* threshold information
-* positive class index
-* input type (DataFrame vs array)
-* validation compatibility checks
-
-A validation script is used before deployment integration:
-
-```bash
-python .\modeling\validate_model_artifact.py .\app\models\lightgbm_v2_h300_balanced.joblib
+app/        → runtime application (API + UI + services)
+scripts/    → data ingestion + dataset building
+data/       → processed datasets
+modeling/   → training + validation scripts
+docs/       → documentation + architecture
 ```
-
----
-
-## 🌐 API Endpoints
-
-Current backend endpoints include:
-
-### Health check
-
-```http
-GET /health
-```
-
-### Single sample prediction
-
-```http
-GET /sample
-```
-
-### Predict one arrival row
-
-```http
-POST /predict
-```
-
-### Live TfL monitoring
-
-```http
-GET /monitor/live
-POST /monitor/live
-```
-
-The live monitoring route fetches real TfL arrivals, normalizes them into the project schema, and returns model predictions for monitored stations.
-
----
-
-## 🖥 Streamlit Dashboard
-
-The dashboard supports:
-
-* monitoring overview table
-* risk-based arrival inspection
-* delay likelihood visualization
-* current vs usual arrival comparison
-* advanced technical details
-* **Sample demo mode**
-* **Live TfL mode**
-
-This makes the project usable both as:
-
-* a stable presentation demo
-* a real live-data monitoring prototype
 
 ---
 
 ## ⚙️ Setup Instructions
 
-## Clone the repository
-
-```bash
-git clone <your-repo-url>
-cd capstone_project
-```
-
----
-
-## `macOS / Linux`
-
-Install the virtual environment and the required packages by following commands:
+### macOS / Linux
 
 ```bash
 pyenv local 3.11.3
@@ -382,11 +325,7 @@ pip install -r requirements.txt
 
 ---
 
-## `WindowsOS`
-
-Install the virtual environment and the required packages by following commands.
-
-### For `PowerShell` CLI
+### Windows (PowerShell)
 
 ```powershell
 pyenv local 3.11.3
@@ -396,23 +335,21 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### For `Git-bash` CLI
+---
+
+### Windows (Git Bash)
 
 ```bash
 pyenv local 3.11.3
 python -m venv .venv
 source .venv/Scripts/activate
-python -m pip install --upgrade pip
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
 ---
 
 ## 🔑 Environment Variables
-
-Create a `.env` file in the project root as needed.
-
-Typical variables may include:
 
 ```env
 TFL_APP_ID=your_app_id
@@ -421,83 +358,34 @@ DB_PATH=data/raw/tfl_arrivals.sqlite
 POLL_SECONDS=30
 ```
 
-Do **not** commit `.env` to version control.
-
----
-
-## 📡 Data Collection
-
-### Fetch selected stations
-
-```bash
-python scripts/fetch_stations.py
-```
-
-### Start live arrival collection
-
-```bash
-python scripts/collect_arrivals.py
-```
-
-This stores raw arrival snapshots in SQLite.
-
----
-
-## 🛠 Build the Processed Dataset
-
-```bash
-python scripts/build_dataset.py
-```
-
-This step converts raw snapshot data into a processed modeling dataset with engineered features and forecasting targets.
-
----
-
-## 🧪 Run the API
-
-```bash
-python -m uvicorn app.api.main:app --reload
-```
-
-Then open:
-
-* `http://127.0.0.1:8000/health`
-* `http://127.0.0.1:8000/sample`
-* `http://127.0.0.1:8000/monitor/live`
-
----
-
-## 📊 Run the Streamlit Dashboard
-
-```bash
-streamlit run app/ui/streamlit_app.py
-```
-
----
-
-## 🚀 Project Highlights
-
-This project demonstrates:
-
-* real-time API data ingestion
-* time-aware ML feature engineering
-* forecasting-style label design
-* realistic chronological evaluation
-* model artifact validation and handoff
-* backend deployment with FastAPI
-* frontend monitoring with Streamlit
-* live data + fallback demo mode
-* end-to-end productization of an ML system
-
 ---
 
 ## ⚠️ Notes
 
-* raw SQLite data is large and should not be committed
-* `.env` should remain ignored
-* live TfL API availability can vary
-* rolling live features improve as the in-memory cache receives more arrivals
-* sample mode should be kept for presentation safety
+* SQLite data grows large
+* rolling features need warm-up
+* live mode may appear stable (real-world effect)
+* demo mode ensures strong presentation
+
+---
+
+## 🚀 Key Highlights
+
+* real-time ML system
+* forecasting-based prediction
+* feature pipeline + live context
+* artifact-based deployment
+* end-to-end product architecture
+
+---
+
+## 🔮 Future Improvements
+
+* full network coverage
+* external data integration
+* advanced models (sequence models)
+* alerting system
+* cloud deployment
 
 ---
 
@@ -507,3 +395,14 @@ This project demonstrates:
 * Peter Furtado
 * Killian Schmiers
 
+---
+
+## 🏁 Final Note
+
+This project demonstrates how:
+
+> **raw transit data → contextual intelligence → actionable insight**
+
+can be built into a real-world ML system.
+
+---
