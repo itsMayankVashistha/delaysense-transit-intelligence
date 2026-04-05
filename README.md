@@ -1,10 +1,17 @@
-# 🚇 TfL Delay Intelligence
+# DelaySense - Transit Intelligence System
 
-### Real-Time Tube Delay Early Warning System
+Real-time ML-powered early warning system that predicts whether a London Underground arrival is likely to become delayed in the next few minutes.
 
-An end-to-end machine learning system that transforms live London Underground arrival data into **proactive delay risk intelligence**.
+## Why it matters
+Passenger information systems usually show the current state of arrivals, but they do not warn when a currently normal-looking arrival is about to deteriorate. DelaySense turns live arrival predictions into proactive delay-risk intelligence for monitoring and prioritization.
 
----
+## What this repository contains
+- live TfL (Transportation for London) data ingestion pipeline
+- time-aware feature engineering with rolling statistics and baselines
+- forecasting-based ML models for short-horizon delay risk
+- FastAPI backend for inference
+- Streamlit dashboard for interactive monitoring
+- artifact-based deployment workflow
 
 ## 🌟 Overview
 

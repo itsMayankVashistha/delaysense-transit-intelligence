@@ -38,7 +38,7 @@ COLORS = {
 }
 
 st.set_page_config(
-    page_title="TfL Delay Intelligence",
+    page_title="DelaySense",
     page_icon="🚇",
     layout="wide",
 )
@@ -644,7 +644,7 @@ def render_hero():
             <div class="hero-banner"
                  style="background-image: url('data:image/png;base64,{img_base64}');">
                 <div class="hero-content">
-                    <div class="hero-title-overlay">TfL Delay Intelligence</div>
+                    <div class="hero-title-overlay">DelaySense</div>
                     <div class="hero-sub-overlay">
                         Real-time early warning for London Underground arrivals
                     </div>
@@ -665,7 +665,7 @@ def render_hero():
         st.markdown(
             """
             <div class="panel">
-                <div class="section-title" style="font-size:2rem; margin-bottom:0.2rem;">TfL Delay Intelligence</div>
+                <div class="section-title" style="font-size:2rem; margin-bottom:0.2rem;">DelaySense</div>
                 <div style="color:#667085; font-size:1rem;">
                     Real-time early warning dashboard for London Underground arrivals
                 </div>
@@ -1236,7 +1236,7 @@ if monitor_df is not None and monitor_results is not None:
 
         demo_cols = st.columns(4)
         with demo_cols[0]:
-            render_summary_chip("Scenario", "Stakeholder-ready", "Curated mix of high / medium / low risk")
+            render_summary_chip("Delay Scenario", "Mixed Risk Conditions", "Curated mix of high / medium / low risk")
         with demo_cols[1]:
             render_summary_chip("High-risk cases", "3", "To demonstrate urgent attention")
         with demo_cols[2]:
