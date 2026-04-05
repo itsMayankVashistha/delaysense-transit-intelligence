@@ -40,6 +40,14 @@ This project is not just a model — it is a **full ML product system**:
 
 👉 A complete pipeline from **raw data → deployed monitoring system**
 
+<p align="center">
+  <img src="images/dashboard.png" width="900">
+</p>
+
+<p align="center">
+  <em>Final dashboard of DelaySense</em>
+</p>
+
 ---
 
 ## 🧠 Problem Statement
