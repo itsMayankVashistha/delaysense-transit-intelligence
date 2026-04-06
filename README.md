@@ -2,9 +2,50 @@
 
 Real-time ML-powered early warning system that predicts whether a London Underground arrival is likely to become delayed in the next few minutes.
 
+<a id="demo"></a>
+## 💻 Demo
+<p align="center">
+  <img src="images/dashboard.png" width="900">
+</p>
+
+<p align="center">
+  <em>Final dashboard of DelaySense</em>
+</p>
+
+## Contents
+
+- [Why it matters](#why-it-matters)
+- [What this repository contains](#what-this-repository-contains)
+- [Overview](#overview)
+- [What This Project Demonstrates](#what-this-project-demonstrates)
+- [Problem Statement](#problem-statement)
+- [Solution](#solution)
+- [Forecasting Approach](#forecasting-approach)
+- [Key Insight](#key-insight)
+- [System Architecture](#system-architecture)
+- [End-to-End Workflow](#end-to-end-workflow)
+- [Model Artifacts & Versioning](#model-artifacts--versioning)
+- [Demo Mode vs Live Mode](#demo-mode-vs-live-mode)
+- [Live Context & Rolling Features](#live-context--rolling-features)
+- [Dataset & Features](#dataset--features)
+- [Models](#models)
+- [API Endpoints](#api-endpoints)
+- [Dashboard Features](#dashboard-features)
+- [Project Structure](#project-structure)
+- [Setup Instructions](#setup-instructions)
+- [Environment Variables](#environment-variables)
+- [Run it quickly](#run-it-quickly)
+- [Notes](#notes)
+- [Key Highlights](#key-highlights)
+- [Future Improvements](#future-improvements)
+- [Authors](#authors)
+- [Final Note](#final-note)
+
+<a id="why-it-matters"></a>
 ## Why it matters
 Passenger information systems usually show the current state of arrivals, but they do not warn when a currently normal-looking arrival is about to deteriorate. DelaySense turns live arrival predictions into proactive delay-risk intelligence for monitoring and prioritization.
 
+<a id="what-this-repository-contains"></a>
 ## What this repository contains
 - live TfL (Transportation for London) data ingestion pipeline
 - time-aware feature engineering with rolling statistics and baselines
@@ -13,9 +54,10 @@ Passenger information systems usually show the current state of arrivals, but th
 - Streamlit dashboard for interactive monitoring
 - artifact-based deployment workflow
 
+<a id="overview"></a>
 ## 🌟 Overview
 
-TfL Delay Intelligence is a **real-time monitoring and early-warning system** designed to identify which train arrivals are most likely to become delayed in the next few minutes.
+DelaySense is a **real-time monitoring and early-warning system** designed to identify which train arrivals are most likely to become delayed in the next few minutes.
 
 Instead of answering:
 
@@ -27,6 +69,7 @@ This system answers:
 
 ---
 
+<a id="what-this-project-demonstrates"></a>
 ## 🎯 What This Project Demonstrates
 
 This project is not just a model — it is a **full ML product system**:
@@ -40,16 +83,9 @@ This project is not just a model — it is a **full ML product system**:
 
 👉 A complete pipeline from **raw data → deployed monitoring system**
 
-<p align="center">
-  <img src="images/dashboard.png" width="900">
-</p>
-
-<p align="center">
-  <em>Final dashboard of DelaySense</em>
-</p>
-
 ---
 
+<a id="problem-statement"></a>
 ## 🧠 Problem Statement
 
 TfL provides arrival predictions like:
@@ -64,6 +100,7 @@ But this lacks context:
 
 ---
 
+<a id="solution"></a>
 ## 💡 Solution
 
 For each arrival, the system computes:
@@ -80,6 +117,7 @@ This enables:
 
 ---
 
+<a id="forecasting-approach"></a>
 ## 🔮 Forecasting Approach
 
 At time `t`, predict delay at `t + H`.
@@ -93,9 +131,20 @@ This makes the system:
 * proactive ✔️
 * realistic ✔️
 * operationally useful ✔️
+---
+<a id="key-insight"></a>
+## 📊 Key Insight
+
+Initial modeling attempts treated delay prediction as a classification problem on current data, which led to leakage and trivial learning.
+
+The project was reframed as a **time-aware forecasting problem**:
+predicting whether an arrival will become delayed in the future (t + H).
+
+This shift enabled meaningful predictions and realistic deployment.
 
 ---
 
+<a id="system-architecture"></a>
 ## ⚙️ System Architecture
 
 <p align="center">
@@ -103,7 +152,7 @@ This makes the system:
 </p>
 
 <p align="center">
-  <em>End-to-end architecture of the TfL Delay Intelligence system</em>
+  <em>End-to-end architecture of the DelaySense system</em>
 </p>
 
 The system consists of 5 layers:
@@ -132,6 +181,7 @@ The system consists of 5 layers:
 
 ---
 
+<a id="end-to-end-workflow"></a>
 ## 🔄 End-to-End Workflow
 
 ### 1. Data Collection
@@ -193,6 +243,7 @@ streamlit run app/ui/streamlit_app.py
 
 ---
 
+<a id="model-artifacts--versioning"></a>
 ## 🧩 Model Artifacts & Versioning
 
 Multiple model variants are supported:
@@ -216,6 +267,7 @@ app/config/settings.py
 
 ---
 
+<a id="demo-mode-vs-live-mode"></a>
 ## 🎭 Demo Mode vs 🌍 Live Mode
 
 ### 🎭 Demo Mode
@@ -232,6 +284,7 @@ app/config/settings.py
 
 ---
 
+<a id="live-context--rolling-features"></a>
 ## ⏳ Live Context & Rolling Features
 
 * system stores recent arrivals in memory
@@ -244,6 +297,7 @@ app/config/settings.py
 
 ---
 
+<a id="dataset--features"></a>
 ## 📊 Dataset & Features
 
 Each row =
@@ -260,6 +314,7 @@ Each row =
 
 ---
 
+<a id="models"></a>
 ## 🤖 Models
 
 Models explored:
@@ -275,6 +330,7 @@ Current deployed model:
 
 ---
 
+<a id="api-endpoints"></a>
 ## 🌐 API Endpoints
 
 ### Health
@@ -303,6 +359,7 @@ GET /monitor/live
 
 ---
 
+<a id="dashboard-features"></a>
 ## 🖥 Dashboard Features
 
 * monitored arrivals table
@@ -314,6 +371,7 @@ GET /monitor/live
 
 ---
 
+<a id="project-structure"></a>
 ## 📂 Project Structure
 
 ```text
@@ -326,6 +384,7 @@ docs/       → documentation + architecture
 
 ---
 
+<a id="setup-instructions"></a>
 ## ⚙️ Setup Instructions
 
 ### macOS / Linux
@@ -364,6 +423,7 @@ pip install -r requirements.txt
 
 ---
 
+<a id="environment-variables"></a>
 ## 🔑 Environment Variables
 
 ```env
@@ -375,6 +435,17 @@ POLL_SECONDS=30
 
 ---
 
+<a id="run-it-quickly"></a>
+## 👾 Run it quickly
+Use demo mode for an immediate walkthrough, or connect to live TfL data for real-time monitoring.
+```
+pip install -r requirements.txt
+python -m uvicorn app.api.main:app --reload
+streamlit run app/ui/streamlit_app.py
+```
+---
+
+<a id="notes"></a>
 ## ⚠️ Notes
 
 * SQLite data grows large
@@ -384,6 +455,7 @@ POLL_SECONDS=30
 
 ---
 
+<a id="key-highlights"></a>
 ## 🚀 Key Highlights
 
 * real-time ML system
@@ -394,6 +466,7 @@ POLL_SECONDS=30
 
 ---
 
+<a id="future-improvements"></a>
 ## 🔮 Future Improvements
 
 * full network coverage
@@ -404,6 +477,7 @@ POLL_SECONDS=30
 
 ---
 
+<a id="authors"></a>
 ## 👥 Authors
 
 * Mayank Vashistha
@@ -412,6 +486,7 @@ POLL_SECONDS=30
 
 ---
 
+<a id="final-note"></a>
 ## 🏁 Final Note
 
 This project demonstrates how:
