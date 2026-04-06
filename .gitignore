@@ -5,6 +5,8 @@ data/raw/*.sqlite
 data/raw/*.db
 data/raw/*.sqlite3
 data/*.parquet
+!data/sample_data.parquet
+!data/sample_data.paraquet
 __pycache__/
 *.pyc
 notebooks/_cell*.png
