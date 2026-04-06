@@ -54,7 +54,7 @@ st.markdown(
     }}
 
     .block-container {{
-        padding-top: 1.05rem;
+        padding-top: 1.0rem;
         padding-bottom: 2rem;
         max-width: 1480px;
     }}
@@ -212,9 +212,60 @@ st.markdown(
         color: {COLORS["text_soft"]};
     }}
 
+    .priority-card {{
+        border-radius: 20px;
+        padding: 1rem 1rem 0.95rem 1rem;
+        border: 1px solid {COLORS["panel_border"]};
+        box-shadow: 0 10px 24px rgba(20,33,61,0.06);
+        min-height: 152px;
+        background: white;
+    }}
+
+    .priority-card.high {{
+        background: linear-gradient(180deg, rgba(232,93,117,0.14), rgba(255,255,255,0.98));
+    }}
+
+    .priority-card.medium {{
+        background: linear-gradient(180deg, rgba(246,174,45,0.15), rgba(255,255,255,0.98));
+    }}
+
+    .priority-card.low {{
+        background: linear-gradient(180deg, rgba(76,175,125,0.14), rgba(255,255,255,0.98));
+    }}
+
+    .priority-rank {{
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 800;
+        color: {COLORS["text_soft"]};
+        margin-bottom: 0.25rem;
+    }}
+
+    .priority-title {{
+        font-size: 1.1rem;
+        font-weight: 900;
+        color: {COLORS["text_main"]};
+        line-height: 1.25;
+        margin-bottom: 0.35rem;
+    }}
+
+    .priority-sub {{
+        font-size: 0.92rem;
+        color: {COLORS["text_soft"]};
+        margin-bottom: 0.45rem;
+        line-height: 1.45;
+    }}
+
+    .priority-action {{
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: {COLORS["text_main"]};
+    }}
+
     .risk-banner {{
         border-radius: 24px;
-        padding: 1.15rem 1.3rem;
+        padding: 1.2rem 1.3rem;
         color: white;
         margin-bottom: 1rem;
         box-shadow: 0 14px 30px rgba(20,33,61,0.12);
@@ -249,14 +300,14 @@ st.markdown(
         line-height: 1.68;
     }}
 
-    .kpi-row {{
+    .mini-row {{
         display: flex;
         gap: 0.85rem;
         flex-wrap: wrap;
-        margin-top: 0.18rem;
+        margin-top: 0.12rem;
     }}
 
-    .kpi-pill {{
+    .mini-pill {{
         background: rgba(255,255,255,0.96);
         border: 1px solid rgba(220,227,238,0.95);
         border-radius: 18px;
@@ -265,13 +316,13 @@ st.markdown(
         box-shadow: 0 8px 18px rgba(20,33,61,0.04);
     }}
 
-    .kpi-pill-label {{
+    .mini-pill-label {{
         font-size: 0.78rem;
         color: {COLORS["text_soft"]};
         margin-bottom: 0.2rem;
     }}
 
-    .kpi-pill-value {{
+    .mini-pill-value {{
         font-size: 1.12rem;
         font-weight: 900;
         color: {COLORS["text_main"]};
@@ -635,6 +686,20 @@ def render_summary_chip(label, value, sub):
     )
 
 
+def render_priority_card(rank_label, title, sub, action_text, tone="medium"):
+    st.markdown(
+        f"""
+        <div class="priority-card {tone}">
+            <div class="priority-rank">{rank_label}</div>
+            <div class="priority-title">{title}</div>
+            <div class="priority-sub">{sub}</div>
+            <div class="priority-action">{action_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_hero():
     if HERO_IMAGE.exists():
         img_bytes = HERO_IMAGE.read_bytes()
@@ -649,12 +714,12 @@ def render_hero():
                         Real-time early warning for London Underground arrivals
                     </div>
                     <div class="hero-sub-overlay">
-                        Live monitoring, short-horizon delay risk, and context-aware arrival intelligence
+                        Identify which arrivals need attention first, before delays become visible
                     </div>
                     <div class="hero-tag-row">
                         <span class="hero-tag">Live monitor</span>
-                        <span class="hero-tag">Recent context</span>
-                        <span class="hero-tag">Forecasting-driven</span>
+                        <span class="hero-tag">Short-horizon prediction</span>
+                        <span class="hero-tag">Operational prioritization</span>
                     </div>
                 </div>
             </div>
@@ -678,11 +743,7 @@ def render_hero():
 def format_model_name(model_info):
     if not model_info:
         return "ML Model"
-    name = (
-        model_info.get("model_name")
-        or model_info.get("model_family")
-        or ""
-    )
+    name = model_info.get("model_name") or model_info.get("model_family") or ""
     lowered = str(name).lower()
     if "lightgbm" in lowered:
         return "LightGBM"
@@ -738,7 +799,7 @@ def parse_iso_to_local_string(value):
         return "—"
     try:
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        dt_local = dt.astimezone()   # convert to local machine timezone
+        dt_local = dt.astimezone()
         return dt_local.strftime("%H:%M:%S")
     except Exception:
         return str(value)
@@ -762,6 +823,95 @@ def overall_risk_label(avg_prob):
     if avg_prob >= 0.30:
         return "Medium"
     return "Low"
+
+
+def risk_tone(risk):
+    risk = str(risk).lower()
+    if risk == "high":
+        return "high"
+    if risk == "medium":
+        return "medium"
+    return "low"
+
+
+def action_text_from_risk(risk):
+    risk = str(risk).lower()
+    if risk == "high":
+        return "Investigate immediately"
+    if risk == "medium":
+        return "Monitor closely"
+    return "No immediate action needed"
+
+
+def action_sentence(result):
+    risk = str(result["risk"]).lower()
+    features = result["features"]
+    display = result["display"]
+    delta = float(features["deviation_from_baseline"])
+    station = display.get("stop_name", "This arrival")
+    destination = display.get("destination_name", "its destination")
+
+    if risk == "high":
+        return (
+            f"{station} is running significantly slower than usual and may create downstream delay pressure toward "
+            f"{destination}."
+        )
+    if risk == "medium":
+        return (
+            f"{station} is showing elevated delay risk and should stay on the watchlist if conditions continue to worsen."
+        )
+    if delta < 0:
+        return f"{station} is currently performing close to or slightly better than usual conditions."
+    return f"{station} is operating near normal conditions with low near-term delay risk."
+
+
+def rewrite_explanation(result):
+    features = result["features"]
+    current_sec = float(features["time_to_station"])
+    usual_sec = float(features["baseline_median_tts"])
+    delta_sec = float(features["deviation_from_baseline"])
+    prob = float(result["prob"])
+    risk = str(result["risk"]).lower()
+
+    if delta_sec > 0:
+        state_text = (
+            f"The current arrival estimate is {format_seconds_human(current_sec)}, which is "
+            f"{format_seconds_human(delta_sec)} slower than the usual {format_seconds_human(usual_sec)}."
+        )
+    elif delta_sec < 0:
+        state_text = (
+            f"The current arrival estimate is {format_seconds_human(current_sec)}, which is "
+            f"{format_seconds_human(abs(delta_sec))} faster than the usual {format_seconds_human(usual_sec)}."
+        )
+    else:
+        state_text = (
+            f"The current arrival estimate is {format_seconds_human(current_sec)}, which is in line with the "
+            f"usual {format_seconds_human(usual_sec)}."
+        )
+
+    if risk == "high":
+        decision_text = (
+            f"This is a high-risk case ({prob:.1%}) and should be investigated immediately."
+        )
+    elif risk == "medium":
+        decision_text = (
+            f"This is a medium-risk case ({prob:.1%}) and should remain under close monitoring."
+        )
+    else:
+        decision_text = (
+            f"This is a low-risk case ({prob:.1%}) and does not currently require immediate action."
+        )
+
+    return f"{state_text} {decision_text}"
+
+
+def selected_arrival_micro_hint(features):
+    delta = float(features["deviation_from_baseline"])
+    if delta > 120:
+        return "Currently slower than usual"
+    if delta < -120:
+        return "Currently faster than usual"
+    return "Currently close to usual conditions"
 
 
 def apply_plot_style(fig):
@@ -818,89 +968,6 @@ def fig_current_vs_usual(current_sec, usual_sec):
     return apply_plot_style(fig)
 
 
-def fig_likelihood_across_arrivals(monitor_results):
-    rows = []
-    for r in monitor_results:
-        rows.append(
-            {
-                "Station": r["display"]["stop_name"],
-                "Likelihood": float(r["prob"]),
-                "Risk": str(r["risk"]).upper(),
-            }
-        )
-
-    df = pd.DataFrame(rows).sort_values("Likelihood", ascending=True)
-
-    fig = px.bar(
-        df,
-        x="Likelihood",
-        y="Station",
-        orientation="h",
-        color="Risk",
-        color_discrete_map={
-            "HIGH": COLORS["high"],
-            "MEDIUM": COLORS["medium"],
-            "LOW": COLORS["low"],
-        },
-        text="Likelihood",
-    )
-    fig.update_traces(
-        texttemplate="%{text:.1%}",
-        textposition="outside",
-        marker_line_width=0,
-        hovertemplate="%{y}: %{x:.1%}<extra></extra>",
-    )
-    fig.update_xaxes(range=[0, 1], tickformat=".0%")
-    return apply_plot_style(fig)
-
-
-def fig_network_snapshot(monitor_results):
-    rows = []
-    for r in monitor_results:
-        features = r["features"]
-        display = r["display"]
-        rows.append(
-            {
-                "Station": display["stop_name"],
-                "CurrentArrivalMin": float(features["time_to_station"]) / 60.0,
-                "DelayLikelihood": float(r["prob"]),
-                "ExtraDelayMin": abs(float(features["deviation_from_baseline"])) / 60.0,
-                "Risk": str(r["risk"]).upper(),
-            }
-        )
-
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return None
-
-    fig = px.scatter(
-        df,
-        x="CurrentArrivalMin",
-        y="DelayLikelihood",
-        size="ExtraDelayMin",
-        color="Risk",
-        hover_name="Station",
-        size_max=34,
-        color_discrete_map={
-            "HIGH": COLORS["high"],
-            "MEDIUM": COLORS["medium"],
-            "LOW": COLORS["low"],
-        },
-    )
-    fig.update_traces(
-        marker=dict(line=dict(width=1, color="rgba(255,255,255,0.85)")),
-        hovertemplate=(
-            "<b>%{hovertext}</b><br>"
-            "Current arrival: %{x:.1f} min<br>"
-            "Delay likelihood: %{y:.1%}<br>"
-            "<extra></extra>"
-        ),
-    )
-    fig.update_yaxes(range=[0, 1], tickformat=".0%")
-    fig.update_xaxes(title="Current arrival (min)")
-    return apply_plot_style(fig)
-
-
 def fig_selected_station_trend(selected_station, source_label):
     if str(source_label).startswith("tfl_live"):
         history = st.session_state.get("live_history", [])
@@ -929,19 +996,56 @@ def fig_selected_station_trend(selected_station, source_label):
     )
     fig.update_traces(
         line=dict(width=3, color=COLORS["blue_soft"]),
-        hovertemplate="%{x|%H:%M:%S}<br>Delay likelihood: %{y:.1%}<extra></extra>",
+        hovertemplate="%{x|%H:%M:%S}<br>Delay risk: %{y:.1%}<extra></extra>",
     )
     fig.update_yaxes(range=[0, 1], tickformat=".0%")
     fig.update_xaxes(title=None)
     return apply_plot_style(fig)
 
-def selected_arrival_micro_hint(features):
-    delta = float(features["deviation_from_baseline"])
-    if delta > 120:
-        return "Currently slower than usual"
-    if delta < -120:
-        return "Currently faster than usual"
-    return "Currently close to usual conditions"
+
+def fig_network_risk_ranking(monitor_results):
+    rows = []
+    for r in monitor_results:
+        display = r["display"]
+        features = r["features"]
+        rows.append(
+            {
+                "Station": display["stop_name"],
+                "DelayRisk": float(r["prob"]),
+                "Risk": str(r["risk"]).upper(),
+                "DifferenceLabel": format_delta_human(features["deviation_from_baseline"]),
+                "DifferenceSeconds": float(features["deviation_from_baseline"]),
+            }
+        )
+
+    df = pd.DataFrame(rows).sort_values("DelayRisk", ascending=True)
+
+    fig = px.bar(
+        df,
+        x="DelayRisk",
+        y="Station",
+        orientation="h",
+        color="Risk",
+        color_discrete_map={
+            "HIGH": COLORS["high"],
+            "MEDIUM": COLORS["medium"],
+            "LOW": COLORS["low"],
+        },
+        text="DelayRisk",
+    )
+    fig.update_traces(
+        texttemplate="%{text:.1%}",
+        textposition="outside",
+        marker_line_width=0,
+        customdata=np.stack([df["DifferenceLabel"]], axis=-1),
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Delay risk: %{x:.1%}<br>"
+            "Difference vs usual: %{customdata[0]}<extra></extra>"
+        ),
+    )
+    fig.update_xaxes(range=[0, 1], tickformat=".0%")
+    return apply_plot_style(fig)
 
 
 def build_monitoring_table(results):
@@ -970,8 +1074,9 @@ def build_monitoring_table(results):
                 "Current arrival": format_seconds_human(features["time_to_station"]),
                 "Usual arrival": format_seconds_human(features["baseline_median_tts"]),
                 "Difference": format_delta_human(features["deviation_from_baseline"]),
-                "Delay likelihood": f"{float(result['prob']):.1%}",
+                "Delay risk (next 5 min)": f"{float(result['prob']):.1%}",
                 "Risk": risk,
+                "Action": action_text_from_risk(result["risk"]),
                 "Alert": "YES" if result["alert_flag"] else "NO",
                 "_sort_likelihood": float(result["prob"]),
                 "_sort_delay": float(features["deviation_from_baseline"]),
@@ -1028,6 +1133,10 @@ def append_live_history(monitor_results, monitor_status):
     st.session_state["live_history"] = st.session_state["live_history"][-500:]
 
 
+def get_priority_results(monitor_results, top_n=3):
+    return sorted(monitor_results, key=lambda x: float(x["prob"]), reverse=True)[:top_n]
+
+
 render_hero()
 
 top_left, top_right = st.columns([1.15, 0.85])
@@ -1051,7 +1160,7 @@ with top_left:
     )
 
     include_intelligence = st.checkbox(
-        "Show advanced details",
+        "Show technical details",
         value=False,
     )
 
@@ -1067,7 +1176,7 @@ with top_left:
 
 with top_right:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">System Status</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">System status</div>', unsafe_allow_html=True)
 
     health_data = None
     health_error = None
@@ -1104,16 +1213,16 @@ with top_right:
     c3, c4 = st.columns(2)
     with c3:
         render_status_card(
-            "Model",
-            model_display,
             "Prediction engine",
+            model_display,
+            "Model currently loaded",
             tone="blue",
         )
     with c4:
         render_status_card(
             "Insights",
             "On" if (health_data and health_data.get("intelligence_enabled")) else "Off",
-            "Advanced context",
+            "Additional context",
             tone="green" if (health_data and health_data.get("intelligence_enabled")) else "blue",
         )
 
@@ -1180,23 +1289,23 @@ if monitor_df is not None and monitor_results is not None:
     avg_risk_text = overall_risk_label(avg_likelihood)
     monitored_count = len(monitor_df)
 
-    if str(st.session_state.get("monitor_source", "")).startswith("showcase"):
+    source_label = st.session_state.get("monitor_source", "unknown")
+    source_sub = "Live monitor feed" if str(source_label).startswith("tfl_live") else "Curated showcase set"
+
+    if str(source_label).startswith("showcase"):
         model_display = "Showcase demo"
     else:
         model_display = format_model_name(health_data.get("model_info", {})) if health_data else "ML Model"
-
-    source_label = st.session_state.get("monitor_source", "unknown")
-    source_sub = "Live monitor feed" if str(source_label).startswith("tfl_live") else "Curated showcase set"
 
     summary_cols = st.columns(4)
     with summary_cols[0]:
         render_summary_chip("Monitored arrivals", str(monitored_count), source_sub)
     with summary_cols[1]:
-        render_summary_chip("Alerts active", str(alerts_active), "Currently flagged")
+        render_summary_chip("Priority alerts", str(alerts_active), "Currently above alert threshold")
     with summary_cols[2]:
-        render_summary_chip("Average risk", f"{avg_risk_text} ({avg_likelihood:.1%})", "Across monitored arrivals")
+        render_summary_chip("Network risk", f"{avg_risk_text} ({avg_likelihood:.1%})", "Average delay risk across arrivals")
     with summary_cols[3]:
-        render_summary_chip("Model in use", model_display, "Current display mode")
+        render_summary_chip("Prediction engine", model_display, "Current display mode")
 
     if str(source_label).startswith("tfl_live") and monitor_status:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
@@ -1213,7 +1322,7 @@ if monitor_df is not None and monitor_results is not None:
             render_summary_chip(
                 "Recent context",
                 monitor_readiness_text(monitor_status),
-                "Rolling features use live short-term history",
+                "Rolling features depend on short-term live history",
             )
         with live_cols[2]:
             render_summary_chip(
@@ -1225,38 +1334,49 @@ if monitor_df is not None and monitor_results is not None:
             render_summary_chip(
                 "Live arrivals tracked",
                 str(monitor_status.get("latest_result_count", 0)),
-                "Current rows in latest live state",
+                "Rows in current live state",
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Priority alerts</div>', unsafe_allow_html=True)
+
+    priority_results = get_priority_results(monitor_results, top_n=3)
+    priority_cols = st.columns(3)
+
+    for idx, result in enumerate(priority_results):
+        display = result["display"]
+        features = result["features"]
+        prob = float(result["prob"])
+        risk = str(result["risk"]).lower()
+        title = f"{display.get('stop_name', 'Unknown')} → {display.get('destination_name', 'Unknown')}"
+        sub = (
+            f"Delay risk {prob:.1%} • {format_delta_human(features['deviation_from_baseline'])} "
+            f"vs usual"
+        )
+        action = action_text_from_risk(risk)
+        with priority_cols[idx]:
+            render_priority_card(
+                f"Priority {idx + 1}",
+                title,
+                sub,
+                action,
+                tone=risk_tone(risk),
             )
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    elif str(source_label).startswith("showcase"):
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Showcase mode</div>', unsafe_allow_html=True)
-
-        demo_cols = st.columns(4)
-        with demo_cols[0]:
-            render_summary_chip("Delay Scenario", "Mixed Risk Conditions", "Curated mix of high / medium / low risk")
-        with demo_cols[1]:
-            render_summary_chip("High-risk cases", "3", "To demonstrate urgent attention")
-        with demo_cols[2]:
-            render_summary_chip("Medium-risk cases", "3", "To demonstrate watchlist behavior")
-        with demo_cols[3]:
-            render_summary_chip("Low-risk cases", "3", "To show normal conditions")
-
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     table_col, side_col = st.columns([1.38, 0.62])
 
     with table_col:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Current arrivals overview</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Monitored arrivals</div>', unsafe_allow_html=True)
         st.dataframe(monitor_df, use_container_width=True, hide_index=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with side_col:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Inspect one arrival</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Focus on one arrival</div>', unsafe_allow_html=True)
 
         station_names = [r["display"]["stop_name"] for r in monitor_results]
         default_index = 0
@@ -1290,7 +1410,7 @@ if monitor_df is not None and monitor_results is not None:
                     {selected_station}
                 </div>
                 <div style="color:#475467; font-size:0.96rem; margin-bottom:0.6rem;">
-                    Delay likelihood: <strong>{selected_prob:.1%}</strong><br>
+                    Delay risk: <strong>{selected_prob:.1%}</strong><br>
                     Alert status: <strong>{"YES" if selected_alert else "NO"}</strong><br>
                     Risk level: <strong>{selected_risk}</strong><br>
                     Source: <strong>{source_display}</strong>
@@ -1313,12 +1433,13 @@ if monitor_df is not None and monitor_results is not None:
     features = result["features"]
     prob = float(result["prob"])
     risk = str(result["risk"]).lower()
-    explanation = result["explanation"]
     alert_flag = result["alert_flag"]
     current_sec = float(features["time_to_station"])
     usual_sec = float(features["baseline_median_tts"])
     delta_sec = float(features["deviation_from_baseline"])
     source_display = "Live TfL" if str(source_label).startswith("tfl_live") else "Showcase demo"
+    action_text = action_text_from_risk(risk)
+    explanation = rewrite_explanation(result)
 
     st.markdown(
         f"""
@@ -1326,14 +1447,17 @@ if monitor_df is not None and monitor_results is not None:
             <div style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.08em; opacity:0.88; font-weight:800;">
                 Selected arrival
             </div>
-            <div style="font-size:1.55rem; font-weight:900; margin-top:0.2rem;">
+            <div style="font-size:1.65rem; font-weight:900; margin-top:0.22rem;">
+                {str(result["risk"]).upper()} RISK — {action_text}
+            </div>
+            <div style="margin-top:0.45rem; font-size:1.08rem; font-weight:700;">
                 {display.get("stop_name", "Unknown station")} → {display.get("destination_name", "Unknown destination")}
             </div>
             <div style="margin-top:0.55rem; font-size:1rem;">
-                Delay likelihood: <strong>{prob:.1%}</strong> &nbsp; | &nbsp;
+                Delay risk: <strong>{prob:.1%}</strong> &nbsp; | &nbsp;
                 Alert: <strong>{"YES" if alert_flag else "NO"}</strong> &nbsp; | &nbsp;
                 Mode: <strong>{selected_mode}</strong> &nbsp; | &nbsp;
-                Model: <strong>{model_display}</strong> &nbsp; | &nbsp;
+                Engine: <strong>{model_display}</strong> &nbsp; | &nbsp;
                 Source: <strong>{source_display}</strong>
             </div>
         </div>
@@ -1344,28 +1468,24 @@ if monitor_df is not None and monitor_results is not None:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">What this means</div>', unsafe_allow_html=True)
     st.markdown(
-        f'<div class="explanation-box">{explanation}</div>',
+        f'<div class="explanation-box">{explanation}<br><br><strong>Why it matters:</strong> {action_sentence(result)}</div>',
         unsafe_allow_html=True,
     )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Arrival summary</div>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
-        <div class="kpi-row">
-            <div class="kpi-pill">
-                <div class="kpi-pill-label">Current arrival</div>
-                <div class="kpi-pill-value">{format_seconds_human(current_sec)}</div>
+        <div class="mini-row">
+            <div class="mini-pill">
+                <div class="mini-pill-label">Current arrival</div>
+                <div class="mini-pill-value">{format_seconds_human(current_sec)}</div>
             </div>
-            <div class="kpi-pill">
-                <div class="kpi-pill-label">Usual arrival</div>
-                <div class="kpi-pill-value">{format_seconds_human(usual_sec)}</div>
+            <div class="mini-pill">
+                <div class="mini-pill-label">Usual arrival</div>
+                <div class="mini-pill-value">{format_seconds_human(usual_sec)}</div>
             </div>
-            <div class="kpi-pill">
-                <div class="kpi-pill-label">Difference</div>
-                <div class="kpi-pill-value">{format_delta_human(delta_sec)}</div>
+            <div class="mini-pill">
+                <div class="mini-pill-label">Difference vs usual</div>
+                <div class="mini-pill-value">{format_delta_human(delta_sec)}</div>
             </div>
         </div>
         """,
@@ -1385,7 +1505,7 @@ if monitor_df is not None and monitor_results is not None:
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-    chart_col1, chart_col2 = st.columns(2)
+    chart_col1, chart_col2, chart_col3 = st.columns(3)
 
     with chart_col1:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
@@ -1409,25 +1529,13 @@ if monitor_df is not None and monitor_results is not None:
             st.info("Trend becomes visible after a few refreshes for the selected station.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    lower_col1, lower_col2 = st.columns(2)
-
-    with lower_col1:
+    with chart_col3:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Likelihood across monitored arrivals</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Network risk ranking</div>', unsafe_allow_html=True)
         st.plotly_chart(
-            fig_likelihood_across_arrivals(monitor_results),
+            fig_network_risk_ranking(monitor_results),
             use_container_width=True,
         )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with lower_col2:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Live network snapshot</div>', unsafe_allow_html=True)
-        snapshot_fig = fig_network_snapshot(monitor_results)
-        if snapshot_fig is not None:
-            st.plotly_chart(snapshot_fig, use_container_width=True)
-        else:
-            st.info("No snapshot data available.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     if result.get("intelligence") and include_intelligence and str(source_label).startswith("tfl_live"):
@@ -1459,8 +1567,8 @@ else:
         <div class="panel">
             <div class="empty-state">
                 Click <strong>Start Monitoring</strong> to load either the curated showcase demo
-                or the current live TfL monitor state, compare delay likelihoods across arrivals,
-                and inspect one case in detail.
+                or the current live TfL monitor state. The dashboard will then surface priority
+                arrivals, explain why they matter, and show how risk is evolving.
             </div>
         </div>
         """,

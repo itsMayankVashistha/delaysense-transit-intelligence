@@ -1,11 +1,11 @@
 ---
-title: "TfL Delay Intelligence System: Architecture & Implementation Guide"
+title: "DelaySense System: Architecture & Implementation Guide"
 author: "Killian, Peter, Mayank"
 date: "2026-03-01"
 keywords: "TfL, delay prediction, machine learning, time series, real-time system"
 ---
 
-# TfL Delay Intelligence System: Architecture & Implementation Guide
+# DelaySense System: Architecture & Implementation Guide
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ keywords: "TfL, delay prediction, machine learning, time series, real-time syste
 
 ## Executive Summary
 
-The **TfL Delay Intelligence System** is a real-time machine learning platform that predicts unusual train delays on London's Victoria and Jubilee lines. By continuously monitoring TfL API data and applying feature-based time-aware ML using rolling-window statistics and seasonal baselines, the system provides actionable delay probability predictions to improve passenger experience and operational efficiency.
+The **DelaySense System** is a real-time machine learning platform that predicts the probability that an arrival will become delayed on London's Victoria and Jubilee lines. By continuously monitoring TfL (Transportation of London) API data and applying feature-based time-aware ML using rolling-window statistics and seasonal baselines, the system provides actionable delay probability predictions to improve passenger experience and operational efficiency.
 
 > **Key Innovation**: Event-level time-aware classification that learns from historical patterns to predict abnormal delays in real-time.
 

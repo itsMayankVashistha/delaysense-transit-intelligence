@@ -1,30 +1,34 @@
 # Repository Architecture
 
-This document captures the actual architecture of the current repository, including both:
+This document reflects the current structure and runtime behavior of the DelaySense repository as of the capstone final product state.
 
-- the deployed runtime path used by the FastAPI + Streamlit app
-- the offline data pipeline used to collect TfL arrivals and build feature tables
+It covers:
 
-It also calls out the parts of the repo that appear legacy or only partially integrated.
+- the live product path used by the FastAPI backend and Streamlit dashboard
+- the offline data pipeline used to collect TfL arrivals and prepare historical datasets
+- the repository areas that are current, transitional, or legacy
 
 ## 1. Executive Summary
 
-The repository is organized around one main product flow:
+DelaySense is organized around one practical product flow:
 
-1. collect live TfL arrival snapshots
-2. store them in SQLite
-3. build a processed Parquet dataset plus a baseline lookup table
-4. load a packaged model artifact and baseline table into the app
-5. serve predictions through FastAPI
-6. visualize and inspect them in Streamlit
+1. collect London Underground arrival snapshots from the TfL Arrivals API
+2. store raw snapshots in SQLite
+3. build feature-rich Parquet datasets and a baseline lookup table
+4. package or select a trained model artifact for runtime scoring
+5. serve predictions and live monitor state through FastAPI
+6. present either curated showcase scenarios or live monitoring results through Streamlit
 
-The `app/` directory is the active deployment surface.
+The active deployment surface is `app/`.
 
-The `scripts/` directory drives ingestion and dataset creation.
+The active offline data pipeline lives in `scripts/`.
 
-The `modeling/` directory is mixed: `validate_model_artifact.py` matches the deployed artifact contract, but `train.py` and `predict.py` still look like template-era code and do not represent the active TfL training pipeline.
+The `modeling/` directory is only partially aligned with the deployed product:
 
-## 2. High-Level Architecture Diagram
+- `validate_model_artifact.py` is aligned with the app contract
+- the other modeling files still represent an older training workflow and are not the main runtime path
+
+## 2. High-Level Architecture
 
 ```mermaid
 flowchart LR
@@ -33,7 +37,7 @@ flowchart LR
         USER[Operator or Viewer]
     end
 
-    subgraph Data_Pipeline["Offline Data Pipeline"]
+    subgraph Pipeline["Offline Data Pipeline"]
         FS[scripts/fetch_stations.py]
         CA[scripts/collect_arrivals.py]
         BK[scripts/backup_sqlite.py]
@@ -41,27 +45,26 @@ flowchart LR
         ST[data/raw/stations.csv]
         RAW[data/raw/tfl_arrivals.sqlite]
         SNAP[data/raw/tfl_arrivals_final_backup.sqlite]
-        PROC[data/processed/*.parquet]
-        BASE[data/processed/baseline_table_*.parquet]
+        DS[data/processed/dataset_192H_60_forecast.parquet]
+        BL[data/processed/baseline_table_192H_60_forecast.parquet]
     end
 
-    subgraph Runtime_App["Runtime Application"]
+    subgraph Runtime["Runtime Application"]
         CFG[app/config/settings.py]
         BOOT[app/bootstrap.py]
-        BLS[BaselineService]
+        ARTLOAD[app/services/artifact_loader.py]
+        BASE[BaselineService]
         ROLL[RollingCache]
         PIPE[FeaturePipeline]
-        LOAD[artifact_loader.load_model_artifact]
-        MOCK[MockModel fallback]
         INF[InferenceService]
-        INTEL[IntelligenceLayer optional]
-        LIVE[LiveMonitorManager]
+        HIST[IntelligenceLayer]
         TFLS[TfLApiService]
-        API[FastAPI app/api/main.py]
-        UI[Streamlit app/ui/streamlit_app.py]
+        LIVE[LiveMonitorManager]
+        API[app/api/main.py]
+        UI[app/ui/streamlit_app.py]
         MODELS[app/models/*.joblib]
-        ART[app/artifacts/baseline_table.parquet]
-        DATASET[data/data.parquet]
+        BASEART[app/artifacts/baseline_table.parquet]
+        HISTDATA[data/data.parquet]
     end
 
     USER --> UI
@@ -69,37 +72,38 @@ flowchart LR
 
     TFL --> FS
     TFL --> CA
+    TFL --> TFLS
+
     FS --> ST
     ST --> CA
     CA --> RAW
     RAW --> BK
-    BK --> SNAP
     SNAP --> BD
-    BD --> PROC
-    BD --> BASE
+    BK --> SNAP
+    BD --> DS
+    BD --> BL
 
-    BASE -. copied or promoted .-> ART
-    PROC -. optional historical context .-> DATASET
+    BL -. deployment copy .-> BASEART
+    DS -. optional historical source .-> HISTDATA
 
     CFG --> BOOT
-    ART --> BLS
-    MODELS --> LOAD
-    LOAD --> BOOT
-    MOCK --> BOOT
-    DATASET --> INTEL
+    MODELS --> ARTLOAD
+    ARTLOAD --> BOOT
+    BASEART --> BASE
+    HISTDATA --> HIST
 
-    BOOT --> BLS
+    BOOT --> BASE
     BOOT --> ROLL
     BOOT --> PIPE
     BOOT --> INF
-    BOOT --> INTEL
+    BOOT --> HIST
     BOOT --> TFLS
     BOOT --> LIVE
 
-    BLS --> PIPE
+    BASE --> PIPE
     ROLL --> PIPE
     PIPE --> INF
-    INTEL --> INF
+    HIST --> INF
     TFLS --> LIVE
     INF --> LIVE
 
@@ -108,77 +112,110 @@ flowchart LR
     API --> UI
 ```
 
-## 3. Runtime Component Diagram
+## 3. Runtime Application Architecture
 
-```mermaid
-flowchart TD
-    A[app/api/main.py] --> B[create_services in app/bootstrap.py]
-    U[app/ui/streamlit_app.py] --> A
+### Composition root
 
-    B --> C[BaselineService]
-    B --> D[RollingCache]
-    B --> E[FeaturePipeline]
-    B --> F[InferenceService]
-    B --> G[TfLApiService]
-    B --> H[LiveMonitorManager]
-    B --> I[load_model_artifact]
-    B --> J[MockModel fallback]
-    B --> K[IntelligenceLayer optional]
+`app/bootstrap.py` is the composition root for the deployed application. It is responsible for:
 
-    C --> E
-    D --> E
-    E --> F
-    K --> F
-    I --> F
-    J --> F
-    G --> H
-    F --> H
+- loading configuration from `app/config/settings.py`
+- loading the baseline table
+- loading the selected model artifact from `app/models/`
+- smoke-testing the model input contract
+- optionally enabling the intelligence layer from `data/data.parquet`
+- wiring the live monitor manager and inference service together
 
-    L[app/models/lightgbm_v2_h300_balanced.joblib] --> I
-    M[app/artifacts/baseline_table.parquet] --> C
-    N[data/data.parquet] --> K
-```
+### Runtime services
 
-## 4. Runtime Flow
+- `BaselineService`
+  - reads `app/artifacts/baseline_table.parquet`
+  - provides fallback-aware baseline lookup by stop, line, direction, hour, and weekday
+- `RollingCache`
+  - maintains recent live context in memory
+  - enables rolling short-window features for active monitoring
+- `FeaturePipeline`
+  - transforms a raw arrival row into model-ready features plus display context
+- `InferenceService`
+  - builds model input in the correct feature order
+  - scores `predict_proba()`
+  - applies alert mode thresholds
+  - returns API-ready prediction payloads
+- `TfLApiService`
+  - fetches and normalizes live arrivals from the TfL API
+  - filters to currently supported lines and monitored stops
+- `LiveMonitorManager`
+  - polls TfL on a background thread
+  - scores each live arrival through `InferenceService`
+  - stores the latest live state and monitor status
+- `IntelligenceLayer`
+  - optional enrichment using historical dataset lookups
+  - adds narrative and similar-case context when enabled
 
-### 4.1 App startup
+### Runtime model loading
 
-- `app/api/main.py` imports `create_services()` from `app/bootstrap.py`.
-- `app/bootstrap.py` reads runtime paths and flags from `app/config/settings.py`.
-- It initializes:
-  - `BaselineService`
-  - `RollingCache`
-  - `FeaturePipeline`
-  - model artifact loading through `artifact_loader.py`
-  - optional `IntelligenceLayer`
-  - `InferenceService`
-  - `TfLApiService`
-  - `LiveMonitorManager`
-- A smoke test is executed against the loaded model before the app serves requests.
+The current deployed model path is configured in `app/config/settings.py`:
 
-### 4.2 Live monitoring path
+- `MODEL_PATH = app/models/lightgbm_v2_h300_balanced.joblib`
 
-- `LiveMonitorManager` polls `TfLApiService` on a background thread.
-- `TfLApiService` fetches and normalizes arrivals for selected stations.
-- Each live row is passed to `InferenceService.predict(...)`.
-- `InferenceService` uses:
-  - `FeaturePipeline` to build feature values
-  - `BaselineService` for station-line-direction-hour-weekday baselines
-  - `RollingCache` for live short-window aggregates
-  - the loaded model artifact for `predict_proba()`
-  - optional `IntelligenceLayer` for historical context and narrative output
-- Sorted predictions are exposed through:
-  - `GET /monitor/live`
-  - `GET /monitor/status`
-  - `POST /monitor/refresh`
+The application does not depend on `app/artifacts/model.joblib` for the active runtime path. That file currently exists as a zero-byte placeholder and should be treated as legacy or unused.
 
-### 4.3 Dashboard path
+The loader in `app/services/artifact_loader.py` supports:
 
-- `app/ui/streamlit_app.py` calls the FastAPI backend over HTTP.
-- It can run in:
-  - showcase demo mode
-  - live TfL mode
-- The dashboard is a client of the API, not a direct importer of the service layer.
+- plain joblib model objects
+- packaged payloads containing a pipeline plus metadata
+- sidecar metadata and feature-contract JSON files when present
+
+## 4. Runtime Request Flows
+
+### 4.1 API startup flow
+
+1. `app/api/main.py` imports `create_services()` from `app/bootstrap.py`
+2. services are created immediately at import time
+3. FastAPI lifespan startup starts the `LiveMonitorManager` background thread
+4. live monitoring begins polling TfL every 30 seconds
+
+### 4.2 Direct prediction flow
+
+1. client sends `POST /predict`
+2. `app/api/main.py` validates request payload with `PredictRequest`
+3. `InferenceService.predict()` calls `FeaturePipeline.build()`
+4. the model artifact scores the feature vector
+5. alert thresholds are applied for the chosen mode
+6. response returns:
+   - probability
+   - risk label
+   - alert flag
+   - explanation text
+   - display fields
+   - model feature values
+   - optional intelligence payload
+
+### 4.3 Live monitoring flow
+
+1. `LiveMonitorManager` polls `TfLApiService`
+2. each normalized arrival row is scored through `InferenceService`
+3. results are sorted by probability and deviation-from-baseline severity
+4. FastAPI exposes current monitor state through:
+   - `GET /monitor/live`
+   - `GET /monitor/status`
+   - `POST /monitor/refresh`
+
+### 4.4 Dashboard flow
+
+The dashboard in `app/ui/streamlit_app.py` is an HTTP client of the API, not a direct importer of the service layer.
+
+It supports two user-facing modes:
+
+- `Showcase demo`
+  - uses curated in-app sample payloads for presentation and product storytelling
+- `Live TfL`
+  - pulls active monitor state and status from the FastAPI backend
+
+The dashboard also exposes alert sensitivity choices:
+
+- Conservative
+- Balanced
+- Sensitive
 
 ## 5. Offline Data Pipeline
 
@@ -201,68 +238,67 @@ flowchart TD
     BD --> DS[data/processed/dataset_192H_60_forecast.parquet]
     BD --> BL[data/processed/baseline_table_192H_60_forecast.parquet]
 
-    BL -. deployment copy .-> APPBL[app/artifacts/baseline_table.parquet]
-    DS -. optional intelligence source .-> HIST[data/data.parquet]
+    BL -. runtime deployment copy .-> APPBL[app/artifacts/baseline_table.parquet]
+    DS -. optional intelligence dataset .-> HIST[data/data.parquet]
 ```
 
-## 6. Repository Boundaries
+### Pipeline responsibilities
+
+- `scripts/fetch_stations.py`
+  - retrieves and stores station metadata
+- `scripts/collect_arrivals.py`
+  - polls TfL arrivals and appends snapshots into SQLite
+- `scripts/backup_sqlite.py`
+  - creates a safe snapshot copy for downstream processing
+- `scripts/build_dataset.py`
+  - constructs forecasting-ready datasets and baseline tables from the snapshot database
+- `scripts/check_db.py`
+  - inspects the raw SQLite store for sanity checks
+
+## 6. Repository Zones
 
 ### Active product code
 
 - `app/`
 - `scripts/`
-- selected files in `docs/`
+- `docs/` files that describe the deployed app and repo structure
+- `data/sample_data.parquet` as a lightweight shareable sample dataset
 
-### Mixed or legacy area
+### Active runtime artifacts
+
+- `app/models/*.joblib`
+- `app/artifacts/baseline_table.parquet`
+- `data/data.parquet` when intelligence mode is enabled
+
+### Transitional or legacy areas
 
 - `modeling/train.py`
 - `modeling/predict.py`
 - `modeling/feature_engineering.py`
 - `modeling/config.py`
+- `app/artifacts/model.joblib`
+- the top-level `models/` directory
 
-These files still reference a coffee-quality example workflow and MLflow template configuration rather than the current TfL forecasting pipeline.
+These areas still contain useful historical work, but they are not the cleanest path to understanding the deployed system today.
 
-### Still aligned with the current app contract
+## 7. Key Architectural Observations
 
-- `modeling/validate_model_artifact.py`
-- `app/services/artifact_loader.py`
-- `app/models/*.joblib`
-- `docs/ml_integration_contract.md`
+- The runtime product is cleanly split into configuration, service wiring, API, and UI layers.
+- The Streamlit dashboard is properly decoupled from backend internals through HTTP calls.
+- The live monitor path depends on rolling warm-up because recent context is built in memory over time.
+- Baseline lookup is precomputed and file-based, which keeps online inference lightweight.
+- Real model artifacts are already integrated into the active runtime path through `app/models/`.
+- Historical intelligence is optional and guarded so the app can still run if `data/data.parquet` is absent.
+- The largest remaining architectural inconsistency is the older modeling area, which is not yet fully aligned with the deployed TfL forecasting stack.
 
-## 7. Key File Responsibilities
+## 8. Recommended Mental Model
 
-- `app/bootstrap.py`: composition root for the deployed system.
-- `app/config/settings.py`: runtime paths, model feature contract, alert thresholds, feature flags.
-- `app/services/baseline_service.py`: baseline lookup with fallback logic.
-- `app/services/rolling_cache.py`: in-memory rolling state for live inference.
-- `app/services/feature_pipeline.py`: transforms a raw arrival row into model-ready features plus display context.
-- `app/services/inference_service.py`: model scoring, risk labeling, alert logic, response assembly.
-- `app/services/live_monitor_manager.py`: background polling and latest-results state manager.
-- `app/services/tfl_api_service.py`: live TfL HTTP client and payload normalization.
-- `app/services/intelligence_layer.py`: optional explanation and similar-case enrichment from historical data.
-- `scripts/collect_arrivals.py`: repeated ingestion of live arrivals into SQLite.
-- `scripts/build_dataset.py`: processed feature dataset and baseline-table creation.
+For onboarding, the clearest way to understand the current repository is:
 
-## 8. Architectural Observations
+1. `scripts/` creates raw and processed data assets
+2. `app/artifacts/` and `app/models/` provide runtime inputs
+3. `app/bootstrap.py` wires the app together
+4. `app/api/main.py` exposes prediction and live-monitor endpoints
+5. `app/ui/streamlit_app.py` presents the product in demo or live mode
 
-- The app is reasonably well separated into composition, services, API, and UI layers.
-- The FastAPI backend and Streamlit frontend are decoupled cleanly through HTTP.
-- The live feature path depends on in-memory warmup because `RollingCache` builds recent context only after polling begins.
-- Baseline lookup depends on a precomputed Parquet table rather than querying historical raw data at inference time.
-- Model loading is robust because `artifact_loader.py` supports metadata, feature order, input type, and packaged payload detection.
-- The repo currently contains two model-storage zones:
-  - `app/models/` for runtime deployment
-  - `models/` for older or auxiliary artifacts
-- The biggest architectural inconsistency is the gap between the active TfL app and the older template-style files under `modeling/`.
-
-## 9. Recommended Mental Model
-
-If someone new joins the project, the cleanest way to understand the system is:
-
-1. `scripts/` builds the data assets
-2. `app/artifacts/` and `app/models/` feed the runtime
-3. `app/bootstrap.py` wires everything together
-4. `app/api/main.py` exposes the service layer
-5. `app/ui/streamlit_app.py` presents the results
-
-That is the current real architecture of this repository.
+That is the current working architecture of DelaySense.
