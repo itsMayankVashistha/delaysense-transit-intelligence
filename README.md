@@ -5,7 +5,7 @@ Real-time ML-powered early warning system that predicts whether a London Undergr
 <a id="demo"></a>
 ## 💻 Demo
 <p align="center">
-  <img src="images/dashboard.png" width="900">
+  <img src="images/dashboard_streamlit.png" width="900">
 </p>
 
 <p align="center">
