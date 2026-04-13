@@ -1,0 +1,2 @@
+# Tell GitHub Linguist to treat notebooks as documentation, not primary language
+*.ipynb linguist-documentation

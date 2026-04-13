@@ -1,7 +1,9 @@
+import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.bootstrap import create_services
@@ -24,8 +26,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="TfL Delay Intelligence API",
+    title="DelaySense API",
     lifespan=lifespan,
+)
+
+_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:8501")
+_origins = [o.strip() for o in _origins_env.split(",")]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

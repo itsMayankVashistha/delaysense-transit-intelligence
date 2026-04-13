@@ -154,7 +154,7 @@ data/processed/
 models/*.sav
 mlruns
 models/*
-app/artifacts/
+app/artifacts/*.tmp
 
 #config file has sensitive data
 .mlflow_uri
