@@ -2,14 +2,14 @@ from pathlib import Path
 from datetime import datetime
 import base64
 import json
-
+import os
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import requests
 import streamlit as st
 
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("FRONTEND_API_URL", "http://localhost:8000")
 HERO_IMAGE = Path("app/ui/assets/banner1.png")
 
 COLORS = {
