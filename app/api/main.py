@@ -122,6 +122,21 @@ def monitor_live():
 def monitor_status():
     return live_monitor_manager.get_status()
 
+@app.get("/")
+def root():
+    return {
+        "project": "DelaySense - Transit Intelligence System",
+        "status": "ok",
+        "summary": "Real-time ML-powered early warning system for short-horizon London Underground delay risk.",
+        "available_endpoints": {
+            "docs": "/docs",
+            "health": "/health",
+            "sample": "/sample",
+            "predict": "/predict",
+            "live_monitor": "/monitor/live"
+        }
+    }
+
 
 @app.post("/monitor/refresh")
 def monitor_refresh():

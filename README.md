@@ -1,6 +1,22 @@
 # DelaySense - Transit Intelligence System
 
-Real-time ML-powered early warning system that predicts whether a London Underground arrival is likely to become delayed in the next few minutes.
+[![Live App](https://img.shields.io/badge/Live%20App-Streamlit-brightgreen)](https://delaysense-transit-intelligence.streamlit.app/)
+[![API Health](https://img.shields.io/badge/API-Render-blue)](https://delaysense-transit-intelligence.onrender.com/health)
+[![API Docs](https://img.shields.io/badge/API%20Docs-FastAPI-009688)](https://delaysense-transit-intelligence.onrender.com/docs)
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![ML](https://img.shields.io/badge/Model-LightGBM-orange)
+![Status](https://img.shields.io/badge/Status-Live-success)
+
+Real-time ML-powered early warning system that predicts whether a London Underground arrival is likely to become delayed in the next few minutes, now deployed as a live end-to-end product with a FastAPI backend and Streamlit dashboard.
+
+## Live Deployment
+
+- **Live App:** https://delaysense-transit-intelligence.streamlit.app/
+- **Backend API:** https://delaysense-transit-intelligence.onrender.com/
+- **API Health:** https://delaysense-transit-intelligence.onrender.com/health
+- **API Docs:** https://delaysense-transit-intelligence.onrender.com/docs
+
+DelaySense is now publicly deployed as a real-time ML-powered early warning system for London Underground delay risk. The current live version includes a FastAPI backend, a Streamlit monitoring dashboard, live TfL-based polling, and artifact-based model inference.
 
 <a id="demo"></a>
 ## 💻 Demo
@@ -47,12 +63,13 @@ Passenger information systems usually show the current state of arrivals, but th
 
 <a id="what-this-repository-contains"></a>
 ## What this repository contains
-- live TfL (Transportation for London) data ingestion pipeline
-- time-aware feature engineering with rolling statistics and baselines
-- forecasting-based ML models for short-horizon delay risk
-- FastAPI backend for inference
-- Streamlit dashboard for interactive monitoring
-- artifact-based deployment workflow
+- live TfL (Transport for London) data ingestion pipeline
+- time-aware feature engineering with rolling statistics and baseline context
+- forecasting-based ML models for short-horizon delay risk prediction
+- FastAPI backend for inference and live monitoring
+- Streamlit dashboard for real-time interaction and prioritization
+- artifact-based deployment workflow using packaged model metadata
+- publicly deployed application stack (Render + Streamlit Community Cloud)
 
 <a id="overview"></a>
 ## 🌟 Overview
@@ -72,16 +89,17 @@ This system answers:
 <a id="what-this-project-demonstrates"></a>
 ## 🎯 What This Project Demonstrates
 
-This project is not just a model — it is a **full ML product system**:
+This project is not just a model - it is a complete deployed ML product system:
 
 * 🔄 Real-time TfL API ingestion
-* 🧠 Context-aware feature engineering (rolling + baseline)
-* 📈 Forecasting-based ML predictions
-* ⚙️ FastAPI backend for inference + monitoring
-* 🖥 Streamlit dashboard for product interaction
-* 🧩 Artifact-based ML deployment (joblib + metadata)
+* 🧠 Context-aware feature engineering using rolling and baseline signals
+* 📈 Forecasting-based ML predictions for future delay risk
+* ⚙️ FastAPI backend for inference and live monitoring
+* 🖥 Streamlit dashboard for decision-support interaction
+* 🧩 Artifact-based ML deployment with model metadata and feature contracts
+* ☁️ Public cloud deployment using Render and Streamlit Community Cloud
 
-👉 A complete pipeline from **raw data → deployed monitoring system**
+👉 A full pipeline from raw transit data to a live decision-support product.
 
 ---
 
@@ -332,6 +350,10 @@ Current deployed model:
 
 <a id="api-endpoints"></a>
 ## 🌐 API Endpoints
+### Root
+```http
+GET /
+```
 
 ### Health
 
@@ -342,13 +364,13 @@ GET /health
 ### Predict
 
 ```http
-POST /predict
+POST /sample
 ```
 
 ### Sample
 
 ```http
-GET /sample
+GET /predict
 ```
 
 ### Live Monitoring
@@ -356,6 +378,25 @@ GET /sample
 ```http
 GET /monitor/live
 ```
+
+### Interactive Docs
+```http
+GET /docs
+```
+
+---
+<a id="deployment-stack"></a>
+## ☁️ Deployment Stack
+
+DelaySense is currently deployed as a live two-part application:
+
+- **Frontend:** Streamlit Community Cloud
+- **Backend:** Render
+- **API Framework:** FastAPI
+- **Model Serving:** Joblib artifact loading with metadata-aware inference
+- **Live Data Source:** TfL Unified API
+
+This deployment setup makes the project accessible as a real product rather than only a local prototype.
 
 ---
 
@@ -437,8 +478,12 @@ POLL_SECONDS=30
 
 <a id="run-it-quickly"></a>
 ## 👾 Run it quickly
-Use demo mode for an immediate walkthrough, or connect to live TfL data for real-time monitoring.
-```
+### Try the live deployment
+- Frontend: https://delaysense-transit-intelligence.streamlit.app/
+- Backend docs: https://delaysense-transit-intelligence.onrender.com/docs
+
+### Run locally
+```bash
 pip install -r requirements.txt
 python -m uvicorn app.api.main:app --reload
 streamlit run app/ui/streamlit_app.py
@@ -469,11 +514,12 @@ streamlit run app/ui/streamlit_app.py
 <a id="future-improvements"></a>
 ## 🔮 Future Improvements
 
-* full network coverage
-* external data integration
-* advanced models (sequence models)
-* alerting system
-* cloud deployment
+* grounded GenAI alert briefings using structured evidence
+* live disruption and line-status context from official TfL sources
+* stronger explanation and evidence panels in the dashboard
+* alert logging and monitoring for AI-generated summaries
+* expanded network coverage across more stations and lines
+* richer operational analytics and prioritization workflows
 
 ---
 
